@@ -1,5 +1,6 @@
 import numpy as np
 from pybullet_envs.bullet.bullet_client import BulletClient
+from pybullet_env.robot_bases import URDFBasedRobot
 
 from pybulletgym.envs.mujoco.robot_bases import XmlBasedRobot, MJCFBasedRobot
 
@@ -56,12 +57,12 @@ class MobileManipulatorBase(XmlBasedRobot):
         return - self.walk_target_dist / self.scene.dt
 
 
-class Fetch(MobileManipulatorBase, MJCFBasedRobot):
+class Fetch(MobileManipulatorBase, URDFBasedRobot):
 
     def __init__(self):
         MobileManipulatorBase.__init__(self, power=0.75)
-        MJCFBasedRobot.__init__(self, "fetch/main.xml", "base_link", action_dim=15, obs_dim=11,
-                                add_ignored_joints=True)
+        URDFBasedRobot.__init__(self, "fetch/fetch_description/robots/fetch.urdf", "base_link", action_dim=25,
+                                obs_dim=70)
 
         self.pos_after = 0
 

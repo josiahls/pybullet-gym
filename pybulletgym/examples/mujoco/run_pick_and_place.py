@@ -9,4 +9,4 @@ env.reset()
 for _ in range(1000):
     env.render()
     env.step(env.action_space.sample())
-    sleep(0.5)
+    sleep(1)
