@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <mujoco model="fetch">
-    <compiler inertiafromgeom='true' angle='degree'/>
+    <compiler inertiafromgeom='true' angle='radian' texturedir="./textures"/>
 	<actuator>
         <motor ctrllimited="true" ctrlrange="-1.6056 1.6056" joint="shoulder_pan_joint" kp="403.256"
                name="shoulder_pan_joint"/>
