@@ -150,6 +150,12 @@ register(
 	max_episode_steps=1000
 )
 
+register(
+	id='FetchPickAndPlace-v0',
+	entry_point='pybulletgym.envs.mujoco.gym_locomotion_envs:FetchPickAndPlaceEnv',
+	max_episode_steps=1000
+)
+
 
 def get_list():
 	envs = ['- ' + spec.id for spec in gym.pgym.envs.registry.all() if spec.id.find('Bullet') >= 0 or spec.id.find('MuJoCo') >= 0]
