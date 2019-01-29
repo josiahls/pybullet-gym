@@ -2,12 +2,12 @@ import numpy as np
 
 from .scene_pick_and_place import PickAndPlaceScene
 from .env_bases import BaseBulletEnv
-from .robot_locomotors import Fetch
+from .robot_locomotors import FetchURDF, FetchMJCF
 
 
 class FetchPickAndPlaceEnv(BaseBulletEnv):
     def __init__(self):
-        self.robot = Fetch()
+        self.robot = FetchMJCF()
         BaseBulletEnv.__init__(self, self.robot)
 
         self.joints_at_limit_cost = -0.1

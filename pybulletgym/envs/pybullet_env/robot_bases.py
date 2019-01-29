@@ -161,13 +161,14 @@ class URDFBasedRobot(XmlBasedRobot):
 				basePosition=self.basePosition,
 				baseOrientation=self.baseOrientation,
 				useFixedBase=self.fixed_base,
-				flags=pybullet.URDF_USE_SELF_COLLISION))
+				flags=pybullet.URDF_USE_SELF_COLLISION|pybullet.URDF_USE_MATERIAL_COLORS_FROM_MTL|pybullet.URDF_USE_MATERIAL_TRANSPARANCY_FROM_MTL))
 		else:
 			self.parts, self.jdict, self.ordered_joints, self.robot_body = self.addToScene(self._p,
 				self._p.loadURDF(full_path,
 				basePosition=self.basePosition,
 				baseOrientation=self.baseOrientation,
-				useFixedBase=self.fixed_base))
+				useFixedBase=self.fixed_base,
+				flags=pybullet.URDF_USE_MATERIAL_COLORS_FROM_MTL|pybullet.URDF_USE_MATERIAL_TRANSPARANCY_FROM_MTL))
 
 		self.robot_specific_reset(self._p)
 

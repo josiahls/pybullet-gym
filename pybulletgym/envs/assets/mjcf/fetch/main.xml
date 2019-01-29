@@ -160,7 +160,7 @@
                                                     <site name="grip_r" pos="0.02 -0.01 0" rgba="0 1 0 1"
                                                           size="0.01 0.01 0.01"/>
                                                     <inertial diaginertia="0.1 0.1 0.1" mass="4" pos="-0.01 0 0"/>
-                                                    <joint type="slide" axis="0 1 0" name="r_gripper_finger_joint"
+                                                    <joint limited="true" type="slide" axis="0 1 0" name="r_gripper_finger_joint"
                                                            range="0 0.05"/>
                                                     <geom pos="0 -0.008 0" size="0.0385 0.007 0.0135" type="box"
                                                           name="r_gripper_finger_link" material="gripper_finger_mat"
@@ -170,7 +170,7 @@
                                                     <site name="grip_l" pos="0.02 0.01 0" rgba="0 1 0 1"
                                                           size="0.01 0.01 0.01"/>
                                                     <inertial diaginertia="0.1 0.1 0.1" mass="4" pos="-0.01 0 0"/>
-                                                    <joint type="slide" axis="0 -1 0" name="l_gripper_finger_joint"
+                                                    <joint limited="true" type="slide" axis="0 -1 0" name="l_gripper_finger_joint"
                                                            range="0 0.05"/>
                                                     <geom pos="0 0.008 0" size="0.0385 0.007 0.0135" type="box"
                                                           name="l_gripper_finger_link" material="gripper_finger_mat"
