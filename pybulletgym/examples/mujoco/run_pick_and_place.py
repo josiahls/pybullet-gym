@@ -4,9 +4,9 @@ import gym
 import pybulletgym.envs
 
 env = gym.make('FetchPickAndPlace-v0')
-env.render(mode="human")
 env.reset()
+env.render(mode="rgb_array")
 for _ in range(1000):
-    env.render()
+    print(env.render(mode="rgb_array"))
     env.step(env.action_space.sample())
     sleep(1)
