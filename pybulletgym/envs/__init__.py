@@ -152,7 +152,7 @@ register(
 
 register(
 	id='FetchPickAndPlace-v0',
-	entry_point='pybulletgym.envs.pybullet_env.gym_locomotion_envs:FetchPickAndPlaceEnv',
+	entry_point='pybulletgym.envs.fetch_env.gym_locomotion_envs:FetchPickAndPlaceEnv',
 	max_episode_steps=1000
 )
 

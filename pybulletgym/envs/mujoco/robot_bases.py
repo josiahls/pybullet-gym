@@ -124,10 +124,10 @@ class MJCFBasedRobot(XmlBasedRobot):
             self.doneLoading = 1
             if self.self_collision:
                 self.objects = self._p.loadMJCF(full_path,
-                                                flags=pybullet.URDF_USE_SELF_COLLISION | pybullet.URDF_USE_SELF_COLLISION_EXCLUDE_ALL_PARENTS | pybullet.MJCF_COLORS_FROM_FILE)
+                                                flags=pybullet.URDF_USE_SELF_COLLISION | pybullet.URDF_USE_SELF_COLLISION_EXCLUDE_ALL_PARENTS | pybullet.MJCF_COLORS_FROM_FILE | pybullet.URDF_USE_MATERIAL_COLORS_FROM_MTL | pybullet.URDF_USE_IMPLICIT_CYLINDER)
                 self.parts, self.jdict, self.ordered_joints, self.robot_body = self.addToScene(self._p, self.objects)
             else:
-                self.objects = self._p.loadMJCF(full_path, pybullet.MJCF_COLORS_FROM_FILE)
+                self.objects = self._p.loadMJCF(full_path, pybullet.MJCF_COLORS_FROM_FILE | pybullet.URDF_USE_MATERIAL_COLORS_FROM_MTL | pybullet.URDF_USE_IMPLICIT_CYLINDER)
                 self.parts, self.jdict, self.ordered_joints, self.robot_body = self.addToScene(self._p, self.objects)
         self.robot_specific_reset(self._p)
 

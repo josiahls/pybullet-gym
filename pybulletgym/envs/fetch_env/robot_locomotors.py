@@ -1,6 +1,6 @@
 import numpy as np
 from pybullet_envs.bullet.bullet_client import BulletClient
-from pybullet_env.robot_bases import URDFBasedRobot
+from fetch_env.robot_bases import URDFBasedRobot
 
 from pybulletgym.envs.mujoco.robot_bases import XmlBasedRobot, MJCFBasedRobot
 

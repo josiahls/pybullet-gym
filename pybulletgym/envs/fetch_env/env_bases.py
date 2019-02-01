@@ -67,6 +67,7 @@ class BaseBulletEnv(gym.Env):
 		self.reward = 0
 		dump = 0
 		s = self.robot.reset(self._p)
+		self.camera._p = self._p
 		self.potential = self.robot.calc_potential()
 		return s
 
