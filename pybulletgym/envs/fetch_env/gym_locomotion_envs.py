@@ -10,12 +10,9 @@ class FetchPickAndPlaceEnv(BaseBulletEnv):
         self.robot = FetchURDF()
         BaseBulletEnv.__init__(self, self.robot)
 
-        self.camera_x = self.robot.body_xyz[0]
         self.joints_at_limit_cost = -0.1
-
-    # def create_single_player_scene(self, bullet_client):
-    #     self.stadium_scene = StadiumScene(bullet_client, gravity=9.8, timestep=0.0165 / 4, frame_skip=4)
-    #     return self.stadium_scene
+        self.pick_and_place_scene = None
+        self.rewards = []
 
     def create_single_player_scene(self, bullet_client):
         self.pick_and_place_scene = PickAndPlaceScene(bullet_client, gravity=9.8, timestep=0.0165 / 4, frame_skip=4)
@@ -38,9 +35,6 @@ class FetchPickAndPlaceEnv(BaseBulletEnv):
         potential_old = self.potential
         self.potential = self.robot.calc_potential()
         progress = float(self.potential - potential_old)
-
-        # electricity_cost  = self.electricity_cost  * float(np.abs(a*self.robot.joint_speeds).mean())  # let's assume we have DC motor with controller, and reverse current braking
-        # electricity_cost += self.stall_torque_cost * float(np.square(a).mean())
 
         joints_at_limit_cost = float(self.joints_at_limit_cost * self.robot.joints_at_limit)
         debugmode = 0
