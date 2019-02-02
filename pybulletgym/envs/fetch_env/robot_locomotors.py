@@ -101,6 +101,9 @@ class FetchURDF(MobileManipulatorBase, URDFBasedRobot):
     def robot_specific_reset(self, bullet_client):
         self._p = bullet_client
         self.scene.actor_introduce(self)
+        for part in self.parts:
+            self.parts[part].reset_pose(self.parts[part].initialPosition, self.parts[part].initialOrientation)
+        # self.reset_pose([0, 0, 0], [0, 0, 0, 1])
         self.initial_z = None
 
     def alive_bonus(self, z, pitch):

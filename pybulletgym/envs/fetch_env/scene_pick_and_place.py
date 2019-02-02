@@ -12,7 +12,7 @@ class PickAndPlaceScene(Scene):
     multiplayer = False
     sceneLoaded = 0
 
-    def episode_restart(self, bullet_client):
+    def episode_restart(self, bullet_client: pybullet):
         self._p = bullet_client
         Scene.episode_restart(self, bullet_client)
         if self.sceneLoaded == 0:
@@ -32,8 +32,28 @@ class PickAndPlaceScene(Scene):
 
             # Load the cube
             filename = os.path.join(os.path.dirname(__file__), "..", "assets", "things", "cubes",
+                                    "cube_target.urdf")
+            self._p.loadURDF(filename, [1, -0.3, 0.75])
+
+            # Load the cube
+            filename = os.path.join(os.path.dirname(__file__), "..", "assets", "things", "cubes",
                                     "cube_small.urdf")
             self._p.loadURDF(filename, [1, 0.3, 0.65])
+
+            # Load the cube
+            filename = os.path.join(os.path.dirname(__file__), "..", "assets", "things", "food", 'orange',
+                                    "orange.urdf")
+            self._p.loadURDF(filename, [1, 0.2, 0.75], flags=pybullet.URDF_USE_MATERIAL_COLORS_FROM_MTL|pybullet.URDF_USE_MATERIAL_TRANSPARANCY_FROM_MTL)
+
+            # Load the cube
+            filename = os.path.join(os.path.dirname(__file__), "..", "assets", "things", "food", 'apple',
+                                    "apple.urdf")
+            self._p.loadURDF(filename, [1, -0.5, 0.75], flags=pybullet.URDF_USE_MATERIAL_COLORS_FROM_MTL|pybullet.URDF_USE_MATERIAL_TRANSPARANCY_FROM_MTL)
+
+            # # Load the knife
+            # filename = os.path.join(os.path.dirname(__file__), "..", "assets", "things", "knives",
+            #                         "knife.urdf")
+            # self._p.loadURDF(filename, [1, 0.3, 1], flags=pybullet.URDF_USE_MATERIAL_COLORS_FROM_MTL|pybullet.URDF_USE_MATERIAL_TRANSPARANCY_FROM_MTL)
 
             # # Load the sphere 1
             # filename = os.path.join(os.path.dirname(__file__), "..", "assets", "things", "spheres",
@@ -44,4 +64,3 @@ class PickAndPlaceScene(Scene):
             # filename = os.path.join(os.path.dirname(__file__), "..", "assets", "things", "spheres",
             #                         "sphere_small_zeroinertia.urdf")
             # self._p.loadURDF(filename, [1, -0.3, 0.8])
-

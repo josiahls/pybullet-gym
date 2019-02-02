@@ -1,0 +1,30 @@
+<?xml version="1.0" ?>
+<robot name="orange.urdf">
+  <link name="orange_base_link">
+    <contact>
+      <rolling_friction value="0.001"/>
+      <spinning_friction value="0.001"/>
+    </contact>
+    <inertial>
+      <origin rpy="0 0 0" xyz="0 0 0"/>
+       <mass value=".1"/>
+       <inertia ixx="1" ixy="0" ixz="0" iyy="1" iyz="0" izz="1"/>
+    </inertial>
+    <visual>
+      <origin rpy="0 0 0" xyz="0 0 0"/>
+      <geometry>
+		<mesh filename="orange.obj" scale=".05 .05 .05"/>
+      </geometry>
+      <material name="">
+        <color rgba="1 1 1 1"/>
+      </material>
+    </visual>
+    <collision>
+      <origin rpy="0 0 0" xyz="0 0 0"/>
+      <geometry>
+	     <mesh filename="orange.obj" scale=".05 .05 .05"/>
+      </geometry>
+    </collision>
+  </link>
+</robot>
+

@@ -13,10 +13,22 @@ class FetchPickAndPlaceEnv(BaseBulletEnv):
         self.joints_at_limit_cost = -0.1
         self.pick_and_place_scene = None
         self.rewards = []
+        self.stateId = -1
 
     def create_single_player_scene(self, bullet_client):
         self.pick_and_place_scene = PickAndPlaceScene(bullet_client, gravity=9.8, timestep=0.0165 / 4, frame_skip=4)
         return self.pick_and_place_scene
+
+    def reset(self):
+
+        if self.stateId >= 0:
+            # print("restoreState self.stateId:",self.stateId)
+            self._p.restoreState(self.stateId)
+
+        r = BaseBulletEnv._reset(self)
+
+        if self.stateId < 0:
+            self.stateId = self._p.saveState()
 
     def step(self, a):
         if not self.scene.multiplayer:  # if multiplayer, action first applied to all robots, then global step() called, then _step() for all robots with the same actions
