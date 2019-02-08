@@ -78,7 +78,7 @@ class FetchURDF(MobileManipulatorBase, URDFBasedRobot):
 
         return np.concatenate([
             qpos.flat[1:],  # self.sim.data.qpos.flat[1:],
-            np.clip(qvel, 0, 0).flat  # self.sim.data.qvel.flat,
+            np.clip(qvel, -10, 10).flat  # self.sim.data.qvel.flat,
         ])
 
     def calc_potential(self):
