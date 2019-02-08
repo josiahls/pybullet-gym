@@ -9,19 +9,19 @@
     <visual>
       <origin rpy="0 0 0" xyz="0 0 0"/>
       <geometry>
-		<box size="1 1 1"/>
+		<box size=".1 .1 .1"/>
       </geometry>
        <material name="transparent_red">
         <color rgba="1 0 0 0.5"/>
       </material>
     </visual>
-    <collision concave="yes">
-      <collision_coefficients kp="0"/>
-      <origin rpy="0 0 0" xyz="0 0 0"/>
-      <geometry>
-	 	<box size="1 1 1"/>
-      </geometry>
-    </collision>
+    <!--<collision concave="yes">-->
+      <!--<collision_coefficients kp="0"/>-->
+      <!--<origin rpy="0 0 0" xyz="0 0 0"/>-->
+      <!--<geometry>-->
+	 	<!--<box size=".1 .1 .1"/>-->
+      <!--</geometry>-->
+    <!--</collision>-->
   </link>
 </robot>
 

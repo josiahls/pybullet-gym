@@ -67,8 +67,8 @@ class FetchURDF(MobileManipulatorBase, URDFBasedRobot):
         self.pos_after = 0
 
     def calc_state(self):
-        qpos = np.array([j.get_position() for j in self.ordered_joints], dtype=np.float32).flatten()  # shape (6,)
-        qvel = np.array([j.get_velocity() for j in self.ordered_joints], dtype=np.float32).flatten()  # shape (6,)
+        qpos = np.array([j.get_position() for j in self.ordered_joints], dtype=np.float32).flatten()  # shape (25,)
+        qvel = np.array([j.get_velocity() for j in self.ordered_joints], dtype=np.float32).flatten()  # shape (25,)
 
         j = np.array([j.current_relative_position() for j in self.ordered_joints], dtype=np.float32).flatten()
         # even elements [0::2] position, scaled to -1..+1 between limits
@@ -78,7 +78,7 @@ class FetchURDF(MobileManipulatorBase, URDFBasedRobot):
 
         return np.concatenate([
             qpos.flat[1:],  # self.sim.data.qpos.flat[1:],
-            np.clip(qvel, -10, 10).flat  # self.sim.data.qvel.flat,
+            np.clip(qvel, 0, 0).flat  # self.sim.data.qvel.flat,
         ])
 
     def calc_potential(self):

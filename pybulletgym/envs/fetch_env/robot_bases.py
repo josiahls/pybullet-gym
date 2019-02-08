@@ -140,7 +140,7 @@ class URDFBasedRobot(XmlBasedRobot):
 	Base class for URDF .xml based robots.
 	"""
 
-	def __init__(self, model_urdf, robot_name, action_dim, obs_dim, basePosition=[0, 0, 0], baseOrientation=[0, 0, 0, 1], fixed_base=False, self_collision=False):
+	def __init__(self, model_urdf, robot_name, action_dim, obs_dim, basePosition=[0, 0, 0.01], baseOrientation=[0, 0, 0, 1], fixed_base=False, self_collision=False):
 		XmlBasedRobot.__init__(self, robot_name, action_dim, obs_dim, self_collision)
 
 		self.model_urdf = model_urdf

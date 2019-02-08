@@ -17,8 +17,8 @@ for i in range(p.getNumBodies()):
         baseId = i
         print("found base")
 
-for i in range(5):
-    for _ in range(500):
+for i in range(50):
+    for _ in range(100):
         # print(env.render(mode="human"))
         # env.step(env.action_space.sample())
 

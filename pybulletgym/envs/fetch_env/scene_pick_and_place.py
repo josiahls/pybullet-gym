@@ -24,7 +24,7 @@ class PickAndPlaceScene(Scene):
             # self._p.loadURDF(filename, [-1, 0, 0])
             filename = os.path.join(os.path.dirname(__file__), "..", "assets", "things", "table",
                                     "table.urdf")
-            self._p.loadURDF(filename, [1, 0, 0], [0, 0, 90, 90])
+            self._p.loadURDF(filename, [1.3, 0, 0], [0, 0, 90, 90])
             # Load the plane
             filename = os.path.join(os.path.dirname(__file__), "..", "assets", "things", "plane",
                                     "plane.urdf")
@@ -32,7 +32,7 @@ class PickAndPlaceScene(Scene):
 
             # Load the cube
             filename = os.path.join(os.path.dirname(__file__), "..", "assets", "things", "cubes",
-                                    "cube_target.urdf")
+                                    "cube_target_no_collision.urdf")
             self._p.loadURDF(filename, [1, -0.3, 0.75])
 
             # Load the cube
@@ -51,9 +51,9 @@ class PickAndPlaceScene(Scene):
             self._p.loadURDF(filename, [1, -0.5, 0.75], flags=pybullet.URDF_USE_MATERIAL_COLORS_FROM_MTL|pybullet.URDF_USE_MATERIAL_TRANSPARANCY_FROM_MTL)
 
             # # Load the knife
-            # filename = os.path.join(os.path.dirname(__file__), "..", "assets", "things", "knives",
-            #                         "knife.urdf")
-            # self._p.loadURDF(filename, [1, 0.3, 1], flags=pybullet.URDF_USE_MATERIAL_COLORS_FROM_MTL|pybullet.URDF_USE_MATERIAL_TRANSPARANCY_FROM_MTL)
+            filename = os.path.join(os.path.dirname(__file__), "..", "assets", "things", "knives",
+                                    "knife.urdf")
+            self._p.loadURDF(filename, [1, 0.3, 1], flags=pybullet.URDF_USE_MATERIAL_COLORS_FROM_MTL|pybullet.URDF_USE_MATERIAL_TRANSPARANCY_FROM_MTL)
 
             # # Load the sphere 1
             # filename = os.path.join(os.path.dirname(__file__), "..", "assets", "things", "spheres",
