@@ -5,7 +5,7 @@ import pybulletgym.envs
 import numpy as np
 import pybullet as p
 
-env = gym.make('FetchPickAndPlace-v0')  # type: gym.Env
+env = gym.make('FetchPickKnifeAndCutEnv-v0')  # type: gym.Env
 
 env.render(mode="human")
 env.reset()

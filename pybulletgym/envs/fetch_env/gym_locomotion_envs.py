@@ -1,11 +1,12 @@
 import numpy as np
 
-from .scene_pick_and_place import PickAndPlaceScene
+from .scene_manipulators import PickKnifeAndCutScene
 from .env_bases import BaseBulletEnv
-from .robot_locomotors import FetchURDF, FetchMJCF
+from .robot_locomotors import FetchURDF
 
 
-class FetchPickAndPlaceEnv(BaseBulletEnv):
+class FetchPickKnifeAndCutEnv(BaseBulletEnv):
+
     def __init__(self):
         self.robot = FetchURDF()
         BaseBulletEnv.__init__(self, self.robot)
@@ -16,8 +17,11 @@ class FetchPickAndPlaceEnv(BaseBulletEnv):
         self.stateId = -1
 
     def create_single_player_scene(self, bullet_client):
-        self.pick_and_place_scene = PickAndPlaceScene(bullet_client, gravity=9.8, timestep=0.0165 / 4, frame_skip=4)
+        self.pick_and_place_scene = PickKnifeAndCutScene(bullet_client, gravity=9.8, timestep=0.0165 / 4, frame_skip=4)
         return self.pick_and_place_scene
+
+    # def render(self, mode='human'):
+    #     pass
 
     def reset(self):
 
