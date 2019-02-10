@@ -4,7 +4,9 @@ import gym
 import pybulletgym.envs
 import numpy as np
 import pybullet as p
-import matplotlib.pyplot as plt
+
+import utils
+
 
 # Load the OpenAI gym env
 env = gym.make('FetchPickKnifeAndCutEnv-v0')  # type: gym.Env
@@ -22,21 +24,22 @@ for i in range(p.getNumBodies()):
         print("found base")
 
 # Start matplotlib to show the reward progression
-rewards = []
+plotter = utils.Plotter()
 
 for i in range(50):
     for _ in range(100):
         # print(env.render(mode="human"))
         # env.step(env.action_space.sample())
 
-        # fetchPos, fetchOrn = p.getBasePositionAndOrientation(baseId)
-        # distance = 2
-        # yaw = 90
-        # p.resetDebugVisualizerCamera(distance, yaw, -40, fetchPos)
+        fetchPos, fetchOrn = p.getBasePositionAndOrientation(baseId)
+        distance = 2
+        yaw = 90
+        p.resetDebugVisualizerCamera(distance, yaw, -40, fetchPos)
 
         results = env.step(np.zeros(env.action_space.high.shape))
-        # sleep(.5)
-        sleep(0.02)
+
+        plotter.live_plotter(results[1])
+
     print('Resetting')
     env.reset()
     sleep(1)
