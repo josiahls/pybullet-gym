@@ -31,7 +31,7 @@ setup(name='pybulletgym',
                 if package.startswith('pybulletgym')],
       zip_safe=False,
       install_requires=[
-          'pybullet>=1.7.8',
+          'pybullet>=1.7.8', 'gym', 'numpy'
       ],
       package_data={'pybulletgym': need_files},
 )

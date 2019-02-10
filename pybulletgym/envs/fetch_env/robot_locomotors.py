@@ -12,14 +12,25 @@ class FetchURDF(URDFBasedRobot):
                                 obs_dim=70, self_collision=True)
         self.power = power
         self.camera_x = 0
-        self.start_pos_x, self.start_pos_y, self.start_pos_z = 0, 0, 0
+        self.start_pos_x, self.start_pos_y, self.start_pos_z = 0, 0, 0.01
         self.manipulator_target_x = 1e3  # kilometers away
         self.manipulator_target_y = 0
         self.body_xyz = [0, 0, 0]
+        self.body_rpy = [0, 0, 0]
+        self.initial_z = None
+        self.joint_speeds = []
+        self.joints_at_limit = []
 
         self.pos_after = 0
 
     def calc_state(self):
+        """
+        Calculates the state of the joints in the robot, and its position
+
+        :return:
+        """
+
+        """ Get joint information, what joints are at their limits """
         qpos = np.array([j.get_position() for j in self.ordered_joints], dtype=np.float32).flatten()  # shape (25,)
         qvel = np.array([j.get_velocity() for j in self.ordered_joints], dtype=np.float32).flatten()  # shape (25,)
 
@@ -28,6 +39,22 @@ class FetchURDF(URDFBasedRobot):
         # odd elements  [1::2] angular speed, scaled to show -1..+1
         self.joint_speeds = j[1::2]
         self.joints_at_limit = np.count_nonzero(np.abs(j[0::2]) > 0.99)
+
+        """ Set the robot's general body position. Primarily concerned with torso (base position). """
+        body_pose = self.robot_body.pose()
+        parts_xyz = np.array([p.pose().xyz() for p in self.parts.values()]).flatten()
+        self.body_xyz = (
+            parts_xyz[0::3].mean(), parts_xyz[1::3].mean(),
+            body_pose.xyz()[2])  # torso z is more informative than mean z
+        self.body_rpy = body_pose.rpy()
+
+        """ 
+            Update z, and especially initial z. Unless the robot is supposed to jump, its z really should
+            never change...
+        """
+        z = self.body_xyz[2]
+        if self.initial_z is None:
+            self.initial_z = z
 
         return np.concatenate([
             qpos.flat[1:],  # self.sim.data.qpos.flat[1:],
@@ -50,8 +77,6 @@ class FetchURDF(URDFBasedRobot):
         self.pos_after = self.robot_body.get_pose()[0]
         debugmode = 0
         if debugmode:
-            print("calc_potential: self.walk_target_dist")
-            print(self.walk_target_dist)
             print("self.scene.dt")
             print(self.scene.dt)
             print("self.scene.frame_skip")

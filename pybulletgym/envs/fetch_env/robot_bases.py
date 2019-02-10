@@ -150,7 +150,7 @@ class URDFBasedRobot(XmlBasedRobot):
 
 	def reset(self, bullet_client):
 		self._p = bullet_client
-		self.ordered_joints = []
+		# self.ordered_joints = []
 
 		full_path = os.path.join(os.path.dirname(__file__), "..", "assets", "robots", self.model_urdf)
 		print(full_path)

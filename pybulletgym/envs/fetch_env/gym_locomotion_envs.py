@@ -41,7 +41,7 @@ class FetchPickKnifeAndCutEnv(BaseBulletEnv):
 
         state = self.robot.calc_state()  # also calculates self.joints_at_limit
 
-        # alive = float(self.robot.alive_bonus(state[0]+self.robot.initial_z, self.robot.body_rpy[1]))   # state[0] is body height above ground, body_rpy[1] is pitch
+        alive = float(self.robot.alive_bonus(state[0]+self.robot.initial_z, self.robot.body_rpy[1]))   # state[0] is body height above ground, body_rpy[1] is pitch
         alive = 1  # For no, the robot will always be alive
         done = alive < 0
         if not np.isfinite(state).all():
@@ -53,7 +53,7 @@ class FetchPickKnifeAndCutEnv(BaseBulletEnv):
         progress = float(self.potential - potential_old)
 
         joints_at_limit_cost = float(self.joints_at_limit_cost * self.robot.joints_at_limit)
-        debugmode = 0
+        debugmode = 1
         if debugmode:
             print("alive=")
             print(alive)
