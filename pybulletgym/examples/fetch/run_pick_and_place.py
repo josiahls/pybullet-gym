@@ -24,21 +24,22 @@ for i in range(p.getNumBodies()):
         print("found base")
 
 # Start matplotlib to show the reward progression
-plotter = utils.Plotter()
+# plotter = utils.Plotter()
 
 for i in range(50):
-    for _ in range(100):
+    for _ in range(200):
         # print(env.render(mode="human"))
-        # env.step(env.action_space.sample())
-
-        fetchPos, fetchOrn = p.getBasePositionAndOrientation(baseId)
-        distance = 2
-        yaw = 90
-        p.resetDebugVisualizerCamera(distance, yaw, -40, fetchPos)
+        # results = env.step(env.action_space.sample())
+        # #
+        # fetchPos, fetchOrn = p.getBasePositionAndOrientation(baseId)
+        # distance = 2
+        # yaw = 90
+        # p.resetDebugVisualizerCamera(distance, yaw, -40, fetchPos)
 
         results = env.step(np.zeros(env.action_space.high.shape))
 
-        plotter.live_plotter(results[1])
+        # plotter.live_plotter(results[1])
+        sleep(0.02)
 
     print('Resetting')
     env.reset()

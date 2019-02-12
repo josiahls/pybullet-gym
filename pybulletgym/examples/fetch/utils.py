@@ -1,11 +1,19 @@
 import matplotlib
 import PyQt5
+
 matplotlib.use('Qt4Agg')
 import matplotlib.pyplot as plt
 import numpy as np
 
 
 class Plotter(object):
+    """
+    This class is extended from https://engineersportal.com/blog/2018/8/14/real-time-graphing-in-python
+    for being pretty and very useful.
+
+
+    """
+
     def __init__(self, max_size=100):
         plt.style.use('ggplot')
         self.max_size = max_size

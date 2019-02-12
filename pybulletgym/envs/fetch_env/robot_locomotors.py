@@ -1,6 +1,7 @@
 import numpy as np
 from pybullet_envs.bullet.bullet_client import BulletClient
 from fetch_env.robot_bases import URDFBasedRobot
+from robot_bases import Joint
 
 from pybulletgym.envs.mujoco.robot_bases import XmlBasedRobot, MJCFBasedRobot
 
@@ -22,6 +23,11 @@ class FetchURDF(URDFBasedRobot):
         self.joints_at_limit = []
 
         self.pos_after = 0
+
+        """ Update the manipulator fields. We have these are fields so they are easier to interface with """
+        self.r_gripper_finger_link = None  # type: Joint
+        self.l_gripper_finger_link = None  # type: Joint
+
 
     def calc_state(self):
         """
@@ -87,11 +93,13 @@ class FetchURDF(URDFBasedRobot):
 
     def robot_specific_reset(self, bullet_client):
         self._p = bullet_client
-        self.scene.actor_introduce(self)
         for part in self.parts:
             self.parts[part].reset_pose(self.parts[part].initialPosition, self.parts[part].initialOrientation)
-        # self.reset_pose([0, 0, 0], [0, 0, 0, 1])
+        self.reset_pose([0, 0, 0.01], [0, 0, 0, 1])
         self.initial_z = None
+
+        self.r_gripper_finger_link = self.parts['r_gripper_finger_link']
+        self.l_gripper_finger_link = self.parts['l_gripper_finger_link']
 
     def alive_bonus(self, z, pitch):
         return +2 if z > 0.78 else -1  # 2 here because 17 joints produce a lot of electricity cost just from policy noise, living must be better than dying
