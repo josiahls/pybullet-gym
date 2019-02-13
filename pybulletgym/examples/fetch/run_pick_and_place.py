@@ -27,7 +27,7 @@ for i in range(p.getNumBodies()):
 # plotter = utils.Plotter()
 
 for i in range(50):
-    for _ in range(200):
+    for _ in range(100):
         # print(env.render(mode="human"))
         # results = env.step(env.action_space.sample())
         # #

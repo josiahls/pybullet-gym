@@ -49,6 +49,7 @@
         <child link="r_wheel_link"/>
         <axis xyz="0 1 0"/>
         <limit effort="8.85" velocity="17.4"/>
+        <dynamics damping="0.0"/>
     </joint>
     <link name="l_wheel_link">
         <inertial>
@@ -78,6 +79,7 @@
         <child link="l_wheel_link"/>
         <axis xyz="0 1 0"/>
         <limit effort="8.85" velocity="17.4"/>
+        <dynamics damping="0.0"/>
     </joint>
     <link name="torso_lift_link">
         <inertial>

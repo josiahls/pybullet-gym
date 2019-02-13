@@ -18,7 +18,7 @@ class FetchPickKnifeAndCutEnv(BaseBulletEnv):
         self.pick_and_place_scene = None
         self.rewards = []
         self.stateId = -1
-        self.objects_of_interest = []
+        self._p = None
 
     def create_single_player_scene(self, bullet_client: BulletClient):
 
@@ -30,6 +30,15 @@ class FetchPickKnifeAndCutEnv(BaseBulletEnv):
     #     pass
 
     def reset(self):
+        if self._p is not None:
+            for i in range(self._p.getNumBodies()-1, -1, -1):
+                # If a body is an object of interest
+                if self._p.getBodyInfo(i)[1].decode("utf-8") == '' or \
+                    self._p.getBodyInfo(i)[1].decode("utf-8") == 'cube_concave.urdf':
+                    print(f'Found {self._p.getBodyInfo(i)[1]}')
+                    if self._p.getBodyInfo(i)[1].decode("utf-8") in self.robot.scene.objects_of_interest:
+                        self.robot.scene.objects_of_interest.pop(self._p.getBodyInfo(i)[1].decode("utf-8"))
+                    self._p.removeBody(i)
 
         if self.stateId >= 0:
             # print("restoreState self.stateId:",self.stateId)

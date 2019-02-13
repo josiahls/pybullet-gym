@@ -1,7 +1,9 @@
 import inspect
 import os
 import pybullet
+from time import sleep
 from typing import List, Dict
+import numpy as np
 
 from pybullet_envs.bullet.bullet_client import BulletClient
 
@@ -19,6 +21,7 @@ class PickAndPlaceScene(Scene):
     an object to another location.
 
     """
+
     def __init__(self, bullet_client, gravity, timestep, frame_skip):
         super().__init__(bullet_client, gravity, timestep, frame_skip)
 
@@ -57,6 +60,7 @@ class PickKnifeAndCutScene(Scene):
     The goal of this scene is to set up a scene for picking up a knife, and cutting a sphere or a square
 
     """
+
     def __init__(self, objects_of_interest: List[str], bullet_client, gravity, timestep, frame_skip):
         super().__init__(bullet_client, gravity, timestep, frame_skip)
 
@@ -86,18 +90,24 @@ class PickKnifeAndCutScene(Scene):
                                     "cube_target_no_collision.urdf")
             self._p.loadURDF(filename, [0.8, -0.4, 0.70])
 
-            # Load the cube
-            filename = os.path.join(os.path.dirname(__file__), "..", "assets", "things", "food", 'orange',
-                                    "orange.urdf")
-            self._p.loadURDF(filename, [0.8, 0.4, 0.70],
-                             flags=pybullet.URDF_USE_MATERIAL_COLORS_FROM_MTL |
-                                   pybullet.URDF_USE_MATERIAL_TRANSPARANCY_FROM_MTL)
+            # # Load the cube
+            # filename = os.path.join(os.path.dirname(__file__), "..", "assets", "things", "food", 'orange',
+            #                         "orange.urdf")
+            # self._p.loadURDF(filename, [1, 0.4, 0.70],
+            #                  flags=pybullet.URDF_USE_MATERIAL_COLORS_FROM_MTL |
+            #                        pybullet.URDF_USE_MATERIAL_TRANSPARANCY_FROM_MTL)
 
             filename = os.path.join(os.path.dirname(__file__), "..", "assets", "things", "knives",
                                     "knife.urdf")
-            self._p.loadURDF(filename, [0.75, 0.3, 1.2], self._p.getQuaternionFromEuler([90, 0, 80]),
+            self._p.loadURDF(filename, [0.75, 0.27, 1.2], self._p.getQuaternionFromEuler([90, 0, 80]),
                              flags=pybullet.URDF_USE_MATERIAL_COLORS_FROM_MTL |
                                    pybullet.URDF_USE_MATERIAL_TRANSPARANCY_FROM_MTL)
+
+            # filename = os.path.join(os.path.dirname(__file__), "..", "assets", "things", "knives",
+            #                         "knife.urdf")
+            # self._p.loadURDF(filename, [0.78, 0.22, 0.9], self._p.getQuaternionFromEuler([90, 0, 0]),
+            #                  flags=pybullet.URDF_USE_MATERIAL_COLORS_FROM_MTL |
+            #                        pybullet.URDF_USE_MATERIAL_TRANSPARANCY_FROM_MTL)
 
     def dynamic_object_episode_restart(self, bullet_client: BulletClient):
         self._p = bullet_client
@@ -143,7 +153,7 @@ class PickKnifeAndCutScene(Scene):
             return 0
 
         collision = self._p.getOverlappingObjects(self.objects_of_interest['blade'].get_position(),
-                                            self.objects_of_interest['cube_concave.urdf'].get_position())
+                                                  self.objects_of_interest['cube_concave.urdf'].get_position())
 
         # If a collision is detected in this region, then start checking for cutting
         if collision is not None:
@@ -154,36 +164,86 @@ class PickKnifeAndCutScene(Scene):
 
             # If they are both in the list then cutting is happening
             if blade_id in collision and cube_concave_id in collision:
-                # Allow the knife to pass through the cube
-                self._p.setCollisionFilterPair(blade_id[0], cube_concave_id[0], blade_id[1], cube_concave_id[1], False)
-
-                # Get the cube data:
-                cube_data = self._p.getCollisionShapeData(cube_concave_id[0], cube_concave_id[1])[0]
-                height, width, length = cube_data[3]
+                """ Get data on the knife blade and the cube / slice """
+                cube_collision_data = self._p.getCollisionShapeData(cube_concave_id[0], cube_concave_id[1])[0]
+                cube_visual_data = self._p.getVisualShapeData(cube_concave_id[0])
+                height, width, length = cube_collision_data[3]
                 position = self.objects_of_interest['cube_concave.urdf'].get_position()
-                orientation = self.objects_of_interest['cube_concave.urdf'].get_orientation()
+                orientation = list(self.objects_of_interest['cube_concave.urdf'].get_orientation())
                 # Get the knife data
-                knife_position = self.objects_of_interest['knife.urdf'].get_position()
-                knife_orientation = self.objects_of_interest['knife.urdf'].get_orientation()
+                knife_position = self.objects_of_interest['blade'].get_position()
+                knife_orientation = self.objects_of_interest['blade'].get_orientation()
+
+                """ Add the resulting slices """
+                base_mesh = list(cube_collision_data)
+                # Since the meshes are "Half Extends from center, the mesh coor need to be modified by half
+                base_mesh[3] = list(map(lambda x: x * 0.5, base_mesh[3]))
+
+                base_mesh_slice1 = np.copy(base_mesh[3])
+                base_mesh_slice2 = np.copy(base_mesh[3])
+
+                """ Set slice dynamics """
+                # This is a deciding point between the different axis. Basically 45 degrees
+                turn_thres = .78
+                # Ok first we want to determine the axis to split the cube across. This is a determined via
+                # seeing which orientation the blade 'z' is most perpendicular to
+                blade_z = self._p.getEulerFromQuaternion(knife_orientation)[2]
+                cube_z = self._p.getEulerFromQuaternion(orientation)[2]
+                # So if the blade is more then 45 degrees miss aligned, then split the other way
+                split_id = 1 if abs(blade_z) - abs(cube_z) > turn_thres else 0
+                offset_dir = -1
+
+                split_dist = None
+                knife_area = 0
+                # If the position of the knife on that axis is within the bounds, then...
+                if position[split_id] + (base_mesh_slice1[split_id] * -1 * offset_dir) > knife_position[split_id] > \
+                        position[split_id] - (base_mesh_slice1[split_id] * -1 * offset_dir):
+                    # Get the percent overlap
+                    knife_area = knife_position[split_id] - position[split_id] + (base_mesh_slice1[split_id] * -1 * offset_dir)
+                    total_base_area = (position[split_id] + (base_mesh_slice1[split_id] * -1 * offset_dir)) - \
+                                      (position[split_id] - (base_mesh_slice1[split_id] * -1 * offset_dir))
+
+                    split_dist = knife_area / total_base_area
+
+                # If the distribution is too narrow, then you cant slice
+                if split_dist is None or split_dist < 0.12:
+                    return 0
+
+                """ Allow the knife to pass through the cube """
+                self._p.setCollisionFilterPair(blade_id[0], cube_concave_id[0], blade_id[1], cube_concave_id[1], False)
 
                 # Removing the cube
                 self._p.removeBody(cube_concave_id[0])
                 self.objects_of_interest.pop('cube_concave.urdf')
 
-                # Add the slices instead
+                base_mesh_slice1[split_id] = base_mesh_slice1[split_id] * (split_dist)
+                base_mesh_slice2[split_id] = base_mesh_slice2[split_id] * (1 - split_dist)
+
+                position_1 = list(position)
+                position_1[split_id] = position[split_id] + knife_position[split_id] - position[split_id] + base_mesh_slice1[split_id] * 1.03 * offset_dir
+                position_2 = list(position)
+                position_2[split_id] = position[split_id] + knife_position[split_id] - position[split_id] + base_mesh_slice2[split_id] * 1.03 * 2 * -1 * offset_dir
+
+                # # So, The region we want to split will be perpendicular with the knife orientation
+                # orientation = list(self._p.getEulerFromQuaternion(orientation))
+                # orientation[2] = self._p.getEulerFromQuaternion(knife_orientation)[2]
+                # orientation = self._p.getQuaternionFromEuler(orientation)
+                # base_mesh[3][0] = base_mesh[3][0] * .5
                 # Create the collision shapes
-                collision_slice_1 = self._p.createCollisionShape(self._p.GEOM_BOX, halfExtents=[.1,.05,.1])
-                collision_slice_2 = self._p.createCollisionShape(self._p.GEOM_BOX, halfExtents=[.1,.05,.1])
-                visual_shape_slice_1 = self._p.createVisualShape(self._p.GEOM_BOX, halfExtents=[.1,.05,.1], rgbaColor=[1, 0, 0, 1])
-                visual_shape_slice_2 = self._p.createVisualShape(self._p.GEOM_BOX, halfExtents=[.1,.05,.1], rgbaColor=[1, 0, 0, 1])
+                collision_slice_1 = self._p.createCollisionShape(self._p.GEOM_BOX, halfExtents=base_mesh_slice1)
+                collision_slice_2 = self._p.createCollisionShape(self._p.GEOM_BOX, halfExtents=base_mesh_slice2)
+                visual_shape_slice_1 = self._p.createVisualShape(self._p.GEOM_BOX, halfExtents=base_mesh_slice1,
+                                                                 rgbaColor=[1, 0, 0, 1], specularColor=[0.4, .4, 0])
+                visual_shape_slice_2 = self._p.createVisualShape(self._p.GEOM_BOX, halfExtents=base_mesh_slice2,
+                                                                 rgbaColor=[1, 0, 0, 1], specularColor=[0.4, .4, 0])
 
-                # orientation (z location ) = the knife z location
-                self._p.createMultiBody(collision_slice_1, visual_shape_slice_1, basePosition=position,
-                                        baseOrientation=orientation)
-                self._p.createMultiBody(collision_slice_2, visual_shape_slice_2, basePosition=position,
-                                        baseOrientation=orientation)
+                slice1 = self._p.createMultiBody(baseMass=1, baseCollisionShapeIndex=collision_slice_1,
+                                                 baseVisualShapeIndex=visual_shape_slice_1, basePosition=position_1,
+                                                 baseOrientation=orientation)
 
-
+                slice2 = self._p.createMultiBody(baseMass=1, baseCollisionShapeIndex=collision_slice_2,
+                                                 baseVisualShapeIndex=visual_shape_slice_2, basePosition=position_2,
+                                                 baseOrientation=orientation)
 
                 print('cutting the cube!!!!')
             else:
