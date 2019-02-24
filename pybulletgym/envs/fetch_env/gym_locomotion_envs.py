@@ -1,14 +1,16 @@
+from abc import ABC
+
 import numpy as np
 from pybullet_envs.bullet.bullet_client import BulletClient
-
+import pybullet
 from .scene_manipulators import PickKnifeAndCutScene
 from .env_bases import BaseBulletEnv
 from .robot_locomotors import FetchURDF
-
+from pybullet_envs.bullet import bullet_client
 from typing import List
 
 
-class FetchPickKnifeAndCutEnv(BaseBulletEnv):
+class FetchPickKnifeAndCutEnv(BaseBulletEnv, ABC):
 
     def __init__(self):
         self.robot = FetchURDF()
@@ -16,41 +18,55 @@ class FetchPickKnifeAndCutEnv(BaseBulletEnv):
 
         self.joints_at_limit_cost = -0.1
         self.pick_and_place_scene = None
+        self.potential = 0
         self.rewards = []
         self.stateId = -1
         self._p = None
 
-    def create_single_player_scene(self, bullet_client: BulletClient):
+    def create_single_player_scene(self, _p: BulletClient):
 
-        self.pick_and_place_scene = PickKnifeAndCutScene(['knife.urdf', 'cube_target.urdf', 'orange.urdf', 'cube_concave.urdf'],
-                                                         bullet_client, gravity=9.8, timestep=0.0165 / 4, frame_skip=4)
+        self.pick_and_place_scene = PickKnifeAndCutScene(_p, gravity=9.8, timestep=0.0165 / 4, frame_skip=4)
         return self.pick_and_place_scene
 
-    # def render(self, mode='human'):
-    #     pass
+    def _reset(self):
+        if self.physicsClientId < 0:
+            self.ownsPhysicsClient = True
+
+            if self.isRender:
+                self._p = bullet_client.BulletClient(connection_mode=pybullet.GUI)
+            else:
+                self._p = bullet_client.BulletClient()
+
+            self.physicsClientId = self._p._client
+            self._p.configureDebugVisualizer(pybullet.COV_ENABLE_GUI, 0)
+
+        if self.scene is None:
+            self.scene = self.create_single_player_scene(self._p)
+        if not self.scene.multiplayer and self.ownsPhysicsClient:
+            self.scene.episode_restart(self._p)
+
+        # self.robot.scene = self.scene
+
+        self.frame = 0
+        self.done = 0
+        self.reward = 0
+        dump = 0
+        s = self.robot.reset(self._p, scene=self.scene)
+        self.robot.robot_specific_reset(self._p)
+        self.camera._p = self._p
+        self.potential = self.robot.calc_potential(scene=self.scene)
+
+        return s
 
     def reset(self):
-        if self._p is not None:
-            for i in range(self._p.getNumBodies()-1, -1, -1):
-                # If a body is an object of interest
-                if self._p.getBodyInfo(i)[1].decode("utf-8") == '' or \
-                    self._p.getBodyInfo(i)[1].decode("utf-8") == 'cube_concave.urdf':
-                    print(f'Found {self._p.getBodyInfo(i)[1]}')
-                    if self._p.getBodyInfo(i)[1].decode("utf-8") in self.robot.scene.objects_of_interest:
-                        self.robot.scene.objects_of_interest.pop(self._p.getBodyInfo(i)[1].decode("utf-8"))
-                    self._p.removeBody(i)
+        self._reset()
 
         if self.stateId >= 0:
             # print("restoreState self.stateId:",self.stateId)
             self._p.restoreState(self.stateId)
 
-        r = BaseBulletEnv._reset(self)
-
         if self.stateId < 0:
             self.stateId = self._p.saveState()
-
-        self.robot.scene.dynamic_object_episode_restart(self._p)
-
 
     def step(self, a):
 
@@ -74,7 +90,7 @@ class FetchPickKnifeAndCutEnv(BaseBulletEnv):
 
         # This is the closeness to the goal. this will be determined based on closeness to the knife
         potential_old = self.potential
-        self.potential = self.robot.calc_potential()
+        self.potential = self.robot.calc_potential(scene=self.scene)
         progress = float(self.potential - potential_old)
 
         joints_at_limit_cost = float(self.joints_at_limit_cost * self.robot.joints_at_limit)
@@ -90,14 +106,14 @@ class FetchPickKnifeAndCutEnv(BaseBulletEnv):
             print(joints_at_limit_cost)
 
         """ Grasp Reward (straight line distance) """
-        l_grasp_distance = np.linalg.norm(np.subtract(self.robot.l_gripper_finger_link.get_position(),
-                                                      self.scene.objects_of_interest['knife.urdf'].get_position()))
-        r_grasp_distance = np.linalg.norm(np.subtract(self.robot.r_gripper_finger_link.get_position(),
-                                                      self.scene.objects_of_interest['knife.urdf'].get_position()))
+        l_grasp_distance = 0 # np.linalg.norm(np.subtract(self.robot.l_gripper_finger_link.get_position(),
+                                                     # self.scene.objects_of_interest['knife.urdf'].get_position()))
+        r_grasp_distance = 0 # np.linalg.norm(np.subtract(self.robot.r_gripper_finger_link.get_position(),
+                                                     # self.scene.objects_of_interest['knife.urdf'].get_position()))
 
         """ Distance of knife edge to target cube """
-        knife_distance = np.linalg.norm(np.subtract(self.scene.objects_of_interest['knife.urdf'].get_position(),
-                                                    self.scene.objects_of_interest['cube_target.urdf'].get_position()))
+        knife_distance = 0#np.linalg.norm(np.subtract(self.scene.objects_of_interest['knife.urdf'].get_position(),
+                           #                         self.scene.objects_of_interest['cube_target.urdf'].get_position()))
 
         self.rewards = [
             # alive,

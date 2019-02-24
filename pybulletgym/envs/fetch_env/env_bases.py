@@ -60,7 +60,7 @@ class BaseBulletEnv(gym.Env):
         if not self.scene.multiplayer and self.ownsPhysicsClient:
             self.scene.episode_restart(self._p)
 
-        self.robot.scene = self.scene
+        # self.robot.scene = self.scene
 
         self.frame = 0
         self.done = 0

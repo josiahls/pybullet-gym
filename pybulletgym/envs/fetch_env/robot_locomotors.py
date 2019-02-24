@@ -1,7 +1,11 @@
 import numpy as np
 from pybullet_envs.bullet.bullet_client import BulletClient
+from pybullet_envs.scene_abstract import Scene
+import os
 from fetch_env.robot_bases import URDFBasedRobot
 from robot_bases import Joint
+import pybullet
+from pybullet_envs.bullet import bullet_client
 
 from pybulletgym.envs.mujoco.robot_bases import XmlBasedRobot, MJCFBasedRobot
 
@@ -76,23 +80,53 @@ class FetchURDF(URDFBasedRobot):
             else:
                 i += 1
 
-    def calc_potential(self):
-        # progress in potential field is speed*dt, typical speed is about 2-3 meter per second, this potential will change 2-3 per frame (not per second),
-        # all rewards have rew/frame units and close to 1.0
+    def reset(self, bullet_client, **kwargs):
+        self._p = bullet_client
+        # self.ordered_joints = []
+        full_path = os.path.join(os.path.dirname(__file__), "..", "assets", "robots", self.model_urdf)
+        print(full_path)
+
+        if self.self_collision and self.robot_body is None:
+            self.parts, self.jdict, self.ordered_joints, self.robot_body = self.addToScene(self._p,
+                                                                                           self._p.loadURDF(full_path,
+                                                                                                            basePosition=self.basePosition,
+                                                                                                            baseOrientation=self.baseOrientation,
+                                                                                                            useFixedBase=self.fixed_base,
+                                                                                                            flags=pybullet.URDF_USE_SELF_COLLISION | pybullet.URDF_USE_MATERIAL_COLORS_FROM_MTL | pybullet.URDF_USE_MATERIAL_TRANSPARANCY_FROM_MTL))
+        elif self.robot_body is None:
+            self.parts, self.jdict, self.ordered_joints, self.robot_body = self.addToScene(self._p,
+                                                                                           self._p.loadURDF(full_path,
+                                                                                                            basePosition=self.basePosition,
+                                                                                                            baseOrientation=self.baseOrientation,
+                                                                                                            useFixedBase=self.fixed_base,
+                                                                                                            flags=pybullet.URDF_USE_MATERIAL_COLORS_FROM_MTL | pybullet.URDF_USE_MATERIAL_TRANSPARANCY_FROM_MTL))
+
+        self.robot_specific_reset(self._p)
+
+        s = self.calc_state()  # optimization: calc_state() can calculate something in self.* for calc_potential() to use
+        self.potential = self.calc_potential(scene=kwargs['scene'])
+
+        return s
+
+    def calc_potential(self, **kwargs):
+        scene = kwargs['scene']
+        # progress in potential field is speed*dt, typical speed is about 2-3 meter per second, this potential will
+        # change 2-3 per frame (not per second), all rewards have rew/frame units and close to 1.0
         pos_before = self.pos_after
         self.pos_after = self.robot_body.get_pose()[0]
         debugmode = 0
         if debugmode:
             print("self.scene.dt")
-            print(self.scene.dt)
+            print(scene.dt)
             print("self.scene.frame_skip")
-            print(self.scene.frame_skip)
+            print(scene.frame_skip)
             print("self.scene.timestep")
-            print(self.scene.timestep)
-        return (self.pos_after - pos_before) / self.scene.dt
+            print(scene.timestep)
+        return (self.pos_after - pos_before) / scene.dt
 
     def robot_specific_reset(self, bullet_client):
         self._p = bullet_client
+
         for part in self.parts:
             self.parts[part].reset_pose(self.parts[part].initialPosition, self.parts[part].initialOrientation)
         self.reset_pose([0, 0, 0.01], [0, 0, 0, 1])

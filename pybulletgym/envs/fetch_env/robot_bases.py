@@ -156,10 +156,9 @@ class URDFBasedRobot(XmlBasedRobot):
         self.fixed_base = fixed_base
         self._p = None  # type: BulletClient
 
-    def reset(self, bullet_client):
+    def reset(self, bullet_client, **kwargs):
         self._p = bullet_client
         # self.ordered_joints = []
-
         full_path = os.path.join(os.path.dirname(__file__), "..", "assets", "robots", self.model_urdf)
         print(full_path)
 
@@ -185,7 +184,7 @@ class URDFBasedRobot(XmlBasedRobot):
 
         return s
 
-    def calc_potential(self):
+    def calc_potential(self, **kwargs):
         return 0
 
 
