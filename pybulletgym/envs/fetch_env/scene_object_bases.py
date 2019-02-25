@@ -28,6 +28,7 @@ class SceneObject(BodyPart):
     def reload(self):
         # Load the body if it is currently none (was removed)
         try:
+            print(f'Reloading {self.object_name}')
             if self.keep_on_reset and (self.bodyIndex >= self._p.getNumBodies() or
                                        self._p.getBodyInfo(self.bodyIndex) is None):
                 self._p.loadURDF(**self.params)

@@ -137,9 +137,10 @@ class PickKnifeAndCutScene(Scene):
         """
 
         """ Handle the knife blade collision """
-        for scene_object in reversed(self.scene_objects):
+        for scene_object in self.scene_objects:
             if scene_object.keep_on_reset:
                 try:
+                    # So I think it doesnt like orphans
                     self._p.removeBody(scene_object.bodyIndex)
                 except pybullet.error:
                     pass

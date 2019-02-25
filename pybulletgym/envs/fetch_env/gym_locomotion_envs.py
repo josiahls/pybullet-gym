@@ -62,7 +62,7 @@ class FetchPickKnifeAndCutEnv(BaseBulletEnv, ABC):
     def reset(self):
         if self.scene is not None:
             # Load scene objects that require interaction
-            for scene_object in reversed(self.scene.scene_objects):
+            for scene_object in self.scene.scene_objects:
                 scene_object.reload()
             import os
             # filename = os.path.join(os.path.dirname(__file__), "..", "assets", "things", "cubes",
