@@ -74,7 +74,7 @@ class PickKnifeAndCutScene(Scene):
         Scene.episode_restart(self, bullet_client)
 
         """ If the scene isn't loaded, then load the models """
-        if self.sceneLoaded == 0:
+        if self.sceneLoaded <= 0:
             self.sceneLoaded = 1
 
             filename = os.path.join(os.path.dirname(__file__), "..", "assets", "things", "table",
@@ -90,9 +90,19 @@ class PickKnifeAndCutScene(Scene):
             self.scene_objects.append(
                 SceneObject(bullet_client, filename, [0.82, 0.24, 1.1], self._p.getQuaternionFromEuler([90, 0, 100]),
                             flags=pybullet.URDF_USE_MATERIAL_COLORS_FROM_MTL |
-                                  pybullet.URDF_USE_MATERIAL_TRANSPARANCY_FROM_MTL, keep_on_reset=False))
+                                  pybullet.URDF_USE_MATERIAL_TRANSPARANCY_FROM_MTL))
 
     def dynamic_object_load(self, bullet_client: pybullet):
+        """
+
+            As a note, the remove order does not matter, the reload does matter.
+            Also, you cannot currently have non-removable objects loaded after removable objects.
+
+        :param bullet_client:
+        :return:
+        """
+        self._dynamic_object_clear()
+
         if self.sceneLoaded == 1:
             self.sceneLoaded = 2
 
@@ -103,22 +113,20 @@ class PickKnifeAndCutScene(Scene):
             # #
             filename = os.path.join(os.path.dirname(__file__), "..", "assets", "things", "cubes",
                                     "cube_concave.urdf")
-            self.scene_objects.append(SceneObject(bullet_client, filename, [0.8, 0.3, 0.70]))
+            self.scene_objects.append(SceneObject(bullet_client, filename, [0.8, 0.3, 0.70], removable=True))
             filename = os.path.join(os.path.dirname(__file__), "..", "assets", "things", "knives",
                                     "knife.urdf")
             self.scene_objects.append(
                 SceneObject(bullet_client, filename, [0.82, 0.24, 1.1], self._p.getQuaternionFromEuler([90, 0, 100]),
                             flags=pybullet.URDF_USE_MATERIAL_COLORS_FROM_MTL |
-                                  pybullet.URDF_USE_MATERIAL_TRANSPARANCY_FROM_MTL))
+                                  pybullet.URDF_USE_MATERIAL_TRANSPARANCY_FROM_MTL, removable=True))
 
             filename = os.path.join(os.path.dirname(__file__), "..", "assets", "things", "knives",
                                     "knife.urdf")
             self.scene_objects.append(
                 SceneObject(bullet_client, filename, [0.82, 0.24, 1.1], self._p.getQuaternionFromEuler([90, 0, 100]),
                             flags=pybullet.URDF_USE_MATERIAL_COLORS_FROM_MTL |
-                                  pybullet.URDF_USE_MATERIAL_TRANSPARANCY_FROM_MTL))
-
-
+                                  pybullet.URDF_USE_MATERIAL_TRANSPARANCY_FROM_MTL, removable=True))
 
         # Load scene objects that require interaction
         for scene_object in self.scene_objects:
@@ -138,13 +146,30 @@ class PickKnifeAndCutScene(Scene):
 
         """ Handle the knife blade collision """
         for scene_object in self.scene_objects:
-            if scene_object.keep_on_reset:
-                try:
-                    # So I think it doesnt like orphans
-                    self._p.removeBody(scene_object.bodyIndex)
-                except pybullet.error:
-                    pass
+            if scene_object.removable and not scene_object.removed:
+                print(f'Removing {scene_object.object_name}')
+                # So I think it doesnt like orphans
+                self._p.removeBody(scene_object.bodyIndex)
+                scene_object.removed = True
+                scene_object.removed_order = SceneObject.CURRENT_REMOVED_ORDER
         return 0
+
+    def _dynamic_object_clear(self):
+        """
+        Some objects might be split into smaller objects or duplicated.
+        The original state will most likely not have this, so calling this method is
+        important for state restoration.
+
+        As a note, the remove order does not matter, the reload does matter.
+        Also, you cannot currently have non-removable objects loaded after removable objects.
+
+        :return:
+        """
+        for scene_object in self.scene_objects:
+            if scene_object.removable and not scene_object.removed:
+                # So I think it doesnt like orphans
+                self._p.removeBody(scene_object.bodyIndex)
+                scene_object.removed = True
 
 # class PickKnifeAndCutScene(Scene):
 #     """
