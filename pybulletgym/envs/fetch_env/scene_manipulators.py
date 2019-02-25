@@ -85,28 +85,44 @@ class PickKnifeAndCutScene(Scene):
                                     "plane.urdf")
             self._p.loadURDF(filename)
 
-            # Load the cube
+            filename = os.path.join(os.path.dirname(__file__), "..", "assets", "things", "knives",
+                                    "knife.urdf")
+            self.scene_objects.append(
+                SceneObject(bullet_client, filename, [0.82, 0.24, 1.1], self._p.getQuaternionFromEuler([90, 0, 100]),
+                            flags=pybullet.URDF_USE_MATERIAL_COLORS_FROM_MTL |
+                                  pybullet.URDF_USE_MATERIAL_TRANSPARANCY_FROM_MTL, keep_on_reset=False))
+
+    def dynamic_object_load(self, bullet_client: pybullet):
+        if self.sceneLoaded == 1:
+            self.sceneLoaded = 2
+
+            # # Load the cube
+            # filename = os.path.join(os.path.dirname(__file__), "..", "assets", "things", "cubes",
+            #                         "cube_target_no_collision.urdf")
+            # self.scene_objects.append(SceneObject(bullet_client, filename, [0.8, -0.4, 0.70]))
+            # #
             filename = os.path.join(os.path.dirname(__file__), "..", "assets", "things", "cubes",
-                                    "cube_target_no_collision.urdf")
-            self._p.loadURDF(filename, [0.8, -0.4, 0.70])
+                                    "cube_concave.urdf")
+            self.scene_objects.append(SceneObject(bullet_client, filename, [0.8, 0.3, 0.70]))
+            filename = os.path.join(os.path.dirname(__file__), "..", "assets", "things", "knives",
+                                    "knife.urdf")
+            self.scene_objects.append(
+                SceneObject(bullet_client, filename, [0.82, 0.24, 1.1], self._p.getQuaternionFromEuler([90, 0, 100]),
+                            flags=pybullet.URDF_USE_MATERIAL_COLORS_FROM_MTL |
+                                  pybullet.URDF_USE_MATERIAL_TRANSPARANCY_FROM_MTL))
 
             filename = os.path.join(os.path.dirname(__file__), "..", "assets", "things", "knives",
                                     "knife.urdf")
-            self._p.loadURDF(filename, [0.82, 0.24, 1.1], self._p.getQuaternionFromEuler([90, 0, 100]),
-                             flags=pybullet.URDF_USE_MATERIAL_COLORS_FROM_MTL |
-                                   pybullet.URDF_USE_MATERIAL_TRANSPARANCY_FROM_MTL)
+            self.scene_objects.append(
+                SceneObject(bullet_client, filename, [0.82, 0.24, 1.1], self._p.getQuaternionFromEuler([90, 0, 100]),
+                            flags=pybullet.URDF_USE_MATERIAL_COLORS_FROM_MTL |
+                                  pybullet.URDF_USE_MATERIAL_TRANSPARANCY_FROM_MTL))
 
-            # filename = os.path.join(os.path.dirname(__file__), "..", "assets", "things", "knives",
-            #                         "knife.urdf")
-            # self._p.loadURDF(filename, [0.78, 0.22, 0.9], self._p.getQuaternionFromEuler([90, 0, 0]),
-            #                  flags=pybullet.URDF_USE_MATERIAL_COLORS_FROM_MTL |
-            #                        pybullet.URDF_USE_MATERIAL_TRANSPARANCY_FROM_MTL)
 
-        # # If the original cube was removed, reload
-        # if 'cube_concave.urdf' not in self.objects_of_interest:
-        #     filename = os.path.join(os.path.dirname(__file__), "..", "assets", "things", "cubes",
-        #                             "cube_concave.urdf")
-        #     self._p.loadURDF(filename, [0.8, 0.3, 0.70])
+
+        # Load scene objects that require interaction
+        for scene_object in self.scene_objects:
+            scene_object.reload()
 
     def calc_state(self):
         """
@@ -121,6 +137,12 @@ class PickKnifeAndCutScene(Scene):
         """
 
         """ Handle the knife blade collision """
+        for scene_object in reversed(self.scene_objects):
+            if scene_object.keep_on_reset:
+                try:
+                    self._p.removeBody(scene_object.bodyIndex)
+                except pybullet.error:
+                    pass
         return 0
 
 # class PickKnifeAndCutScene(Scene):

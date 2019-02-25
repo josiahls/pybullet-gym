@@ -52,6 +52,7 @@ class FetchPickKnifeAndCutEnv(BaseBulletEnv, ABC):
         self.reward = 0
         dump = 0
         s = self.robot.reset(self._p, scene=self.scene)
+        self.scene.dynamic_object_load(self._p)
         self.robot.robot_specific_reset(self._p)
         self.camera._p = self._p
         self.potential = self.robot.calc_potential(scene=self.scene)
@@ -59,14 +60,27 @@ class FetchPickKnifeAndCutEnv(BaseBulletEnv, ABC):
         return s
 
     def reset(self):
-        self._reset()
+        if self.scene is not None:
+            # Load scene objects that require interaction
+            for scene_object in reversed(self.scene.scene_objects):
+                scene_object.reload()
+            import os
+            # filename = os.path.join(os.path.dirname(__file__), "..", "assets", "things", "cubes",
+            #                         "cube_target_no_collision.urdf")
+            # self._p.loadURDF(filename, [0.8, -0.4, 0.70])
 
         if self.stateId >= 0:
             # print("restoreState self.stateId:",self.stateId)
+            # self.stateId = self._p.restoreState(filename='state.bullet')
             self._p.restoreState(self.stateId)
+
+        self._reset()
 
         if self.stateId < 0:
             self.stateId = self._p.saveState()
+            # self.stateId = self._p.saveBullet("state.bullet")
+
+
 
     def step(self, a):
 
