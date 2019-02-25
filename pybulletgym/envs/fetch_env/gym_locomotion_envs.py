@@ -67,7 +67,7 @@ class FetchPickKnifeAndCutEnv(BaseBulletEnv, ABC):
         # We want to clear the dynamic objects that might have been modified / added
         # We need to do this so that we can avoid a saved state mismatch
         if self.scene is not None:
-            self.scene.dynamic_object_load(self._p)
+            self.scene._dynamic_object_clear()
 
         if self.stateId >= 0:
             self._p.restoreState(self.stateId)
