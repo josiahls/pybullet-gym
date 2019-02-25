@@ -1,4 +1,5 @@
 import inspect
+import operator
 import os
 import pybullet
 from time import sleep
@@ -127,6 +128,13 @@ class PickKnifeAndCutScene(Scene):
                 SceneObject(bullet_client, filename, [0.82, 0.24, 1.1], self._p.getQuaternionFromEuler([90, 0, 100]),
                             flags=pybullet.URDF_USE_MATERIAL_COLORS_FROM_MTL |
                                   pybullet.URDF_USE_MATERIAL_TRANSPARANCY_FROM_MTL, removable=True))
+
+        if any(map(operator.not_, [__.removable for __ in self.scene_objects[
+                                                          [_.removable for _ in self.scene_objects].index(True):]])):
+            raise Exception('You have an object that is not removable being loaded after removable objects.'
+                            ' For now, you need to load non-removable objects before removable ones. This is due to'
+                            ' bullet3 currently overriding removable objects the later loaded non-removable objects.'
+                            ' Basically... put non-removable objects first.')
 
         # Load scene objects that require interaction
         for scene_object in self.scene_objects:
