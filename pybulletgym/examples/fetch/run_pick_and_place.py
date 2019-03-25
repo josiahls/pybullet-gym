@@ -32,9 +32,9 @@ for i in range(50):
         # results = env.step(env.action_space.sample())
         # #
         # fetchPos, fetchOrn = p.getBasePositionAndOrientation(baseId)
-        # distance = 2
+        # distance = 1.5
         # yaw = 90
-        # p.resetDebugVisualizerCamera(distance, yaw, -40, fetchPos)
+        # p.resetDebugVisualizerCamera(distance, yaw, -45, fetchPos)
 
         results = env.step(np.zeros(env.action_space.high.shape))
 

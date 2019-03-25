@@ -45,6 +45,8 @@ class SceneObject(BodyPart):
         # Load the body if it is currently none (was removed)
         if self.filename is not None and self.removed and self.removable and self.reloadable:
             print(f'Reloading {self.body_name}')
+            # We want to make sure that the slot for this body is empty
+            self._p.removeBody(self.bodyIndex)
             self._p.loadURDF(**self.params)
             self.removed = False
 
@@ -147,60 +149,74 @@ class SlicableSceneObject(SceneObject):
                     # Get the identifying ids for both interacting objects
                     slicing_joint_id = (slicing_joint.bodyIndex, slicing_joint.bodyPartIndex)
                     slicable_object_id = (self.bodyIndex, self.bodyPartIndex)
-                    if slicing_joint_id in collision and slicable_object_id in collision:
+                    # Get the contact points
+                    contacts_to_sliceable = self._p.getContactPoints(slicable_object_id[0], slicing_joint_id[0],
+                                                                     slicable_object_id[1], slicing_joint_id[1])
+                    contacts_to_slicing = self._p.getContactPoints(slicing_joint_id[0], slicable_object_id[0],
+                                                                   slicing_joint_id[1], slicable_object_id[1])
+
+                    # contacts_to_sliceable[0][11] < -0.8 is the specific downward force that the knife (body B) is applying to
+                    # a slicable object A. This prevents "side" slicing. Only the sharp part of the blade is valid
+                    if len(contacts_to_sliceable) > 0 and contacts_to_slicing[0][7][2] > 0.3:
                         print(f'Full Collision is happening at {self.body_name}')
                         """ Do Decomposition """
                         # Get information on slicable object
                         slicable_object_data = self._p.getCollisionShapeData(*slicable_object_id)[0]
-                        slicable_object_visual_data = self._p.getVisualShapeData(slicable_object_id[0])
-                        slicable_height, slicable_width, slicable_length = slicable_object_data[3]
                         slicable_position = self.get_position()
                         slicable_orientation = self.get_orientation()
                         slicable_base_mesh = slicable_object_data[3]
-                        # Get information on slicing object
-                        slicing_object_data = self._p.getCollisionShapeData(*slicing_joint_id)[0]
-                        slicing_object_visual_data = self._p.getVisualShapeData(slicing_joint_id[0])
-                        slicing_height, slicing_width, slicing_length = slicing_object_data[3]
-                        slicing_position = slicing_joint.get_position()
-                        slicing_orientation = slicing_joint.get_orientation()
-                        slicing_base_mesh = slicing_object_data[3]
 
-                        # Convert orientations into easier to read numeric types (degrees)
-                        slicable_orientation_dg = np.rad2deg(self._p.getEulerFromQuaternion(slicable_orientation))
-                        slicing_orientation_dg = np.rad2deg(self._p.getEulerFromQuaternion(slicing_orientation))
-                        # Get the relative orientations. We cut relative to the slicable object
-                        slicable_initial_orientation_dg = np.rad2deg(self._p.getEulerFromQuaternion(self.initialOrientation))
-                        slicing_initial_orientation_dg = np.rad2deg(self._p.getEulerFromQuaternion(slicing_joint.initialOrientation))
-                        slicable_rel_orientation_dg = slicable_initial_orientation_dg - slicable_orientation_dg
-                        # Note, the reason this is this way, is because the knife might be init in a difference place
-                        slicing_rel_orienation_dg = slicing_orientation_dg - slicing_initial_orientation_dg + slicable_rel_orientation_dg
+                        self.split(np.argmax(np.abs(contacts_to_sliceable[0][11])),
+                                   slicable_base_mesh, slicable_position,
+                                   slicable_orientation, scene, contacts_to_sliceable)
 
-                        if 80 < abs(slicing_rel_orienation_dg[0]) < 100 or 170 < abs(slicing_rel_orienation_dg[0]) or \
-                             abs(slicing_rel_orienation_dg[0]) < 10:
-                            print('Knife is rotated such that it can only realistically cut on the z axis')
+    def split(self, axis, original_mesh, original_position, original_orientation, scene, contacts):
+        print(str(scene.scene_objects))
 
-                        # Create fake axis depending on rotation. Is there a better way to do this?
-                        x_axis = 0 if 100 > abs(slicable_orientation_dg[1]) < 80 else 2
-                        y_axis = 1 if 100 > abs(slicable_orientation_dg[0]) < 80 else 2
-                        # Ok, so which axis does the cube need to be split?
-                        if 80 < abs(slicing_rel_orienation_dg[2]) < 100 or 170 < abs(slicing_rel_orienation_dg[2]) or \
-                             abs(slicing_rel_orienation_dg[2]) < 10:
-                            # Set the split axis
-                            sliceable_axis = y_axis if 80 < abs(slicing_rel_orienation_dg[0]) < 100 else x_axis
-                            # Split the object
-                            self.split(sliceable_axis, scene)
+        original_mesh = list(map(lambda x: x * 0.5, original_mesh))
+        # The distributions is the percent overlap the contact has on the cube width
+        distribution = abs((contacts[0][5][axis] - original_position[axis]) / original_mesh[axis])
+        distribution_dir = np.sign((contacts[0][5][axis] - original_position[axis]))
 
-    def split(self, axis, scene):
+        # There are differences in x, y directions. We want to handle these differently
+        distribution = distribution if axis == 1 else (1 - distribution)
+        distribution = distribution if distribution_dir < 0 else (1 - distribution)
+
+        slice_mesh1 = np.copy(original_mesh)
+        slice_mesh2 = np.copy(original_mesh)
+        # We take the width * half (because half extends) * the percent
+        slice_mesh1[axis] = slice_mesh1[axis] * distribution
+        slice_mesh2[axis] = slice_mesh2[axis] * (1 - distribution)
+
+        slice1_position = np.copy(original_position)
+        slice1_position[axis] = contacts[0][5][axis]
+        slice1_position[axis] += (-1.1 * slice_mesh1[axis])
+
+        slice2_position = np.copy(original_position)
+        slice2_position[axis] = contacts[0][5][axis]
+        slice2_position[axis] += (1.1*slice_mesh2[axis])
         # Notes: the baseCollisionShapeIndex and baseVisualShapeIndex will automatically be added
+        self.remove()
         scene.scene_objects.append(SlicableSceneObject(self._p,
                                                        create_body_params={'baseMass':1,
-                                                                           'basePosition': [0, 0, 0],
-                                                                           'baseOrientation': [0, 0, 0, 1]},
+                                                                           'basePosition': slice1_position,
+                                                                           'baseOrientation': original_orientation},
                                                        create_collision_params={'shapeType': self._p.GEOM_BOX,
-                                                                                'halfExtents': [0, 0, 0]},
+                                                                                'halfExtents': slice_mesh1},
                                                        create_visual_shape_params={'shapeType': self._p.GEOM_BOX,
-                                                                                   'halfExtents': [0, 0, 0],
+                                                                                   'halfExtents': slice_mesh1,
                                                                                    'rgbaColor': [1, 0, 0, 1],
                                                                                    'specularColor': [0.4, .4, 0]},
                                                        removable=True, reloadable=False))
-        self.remove()
+
+        scene.scene_objects.append(SlicableSceneObject(self._p,
+                                                       create_body_params={'baseMass':1,
+                                                                           'basePosition': slice2_position,
+                                                                           'baseOrientation': original_orientation},
+                                                       create_collision_params={'shapeType': self._p.GEOM_BOX,
+                                                                                'halfExtents': slice_mesh2},
+                                                       create_visual_shape_params={'shapeType': self._p.GEOM_BOX,
+                                                                                   'halfExtents': slice_mesh2,
+                                                                                   'rgbaColor': [1, 0, 0, 1],
+                                                                                   'specularColor': [0.4, .4, 0]},
+                                                       removable=True, reloadable=False))

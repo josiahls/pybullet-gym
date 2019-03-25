@@ -85,9 +85,20 @@ class PickKnifeAndCutScene(Scene):
 
             filename = os.path.join(os.path.dirname(__file__), "..", "assets", "things", "knives",
                                     "knife.urdf")
+            self.scene_objects.append(SlicingSceneObject(bullet_client, filename, [0.70, 0.28, 0.9],
+                                      self._p.getQuaternionFromEuler([np.deg2rad(90), 0, np.deg2rad(-90)]),
+                                      flags=pybullet.URDF_USE_MATERIAL_COLORS_FROM_MTL |
+                                      pybullet.URDF_USE_MATERIAL_TRANSPARANCY_FROM_MTL, slicing_parts=['blade']))
+
             self.scene_objects.append(
-                SlicingSceneObject(bullet_client, filename, [0.70, 0.28, 0.9],
-                                   self._p.getQuaternionFromEuler([np.deg2rad(90), 0, np.deg2rad(-90)]),
+                SlicingSceneObject(bullet_client, filename, [0.78, -0.29, 0.9],
+                                   self._p.getQuaternionFromEuler([np.deg2rad(90), 0, 0]),
+                            flags=pybullet.URDF_USE_MATERIAL_COLORS_FROM_MTL |
+                                  pybullet.URDF_USE_MATERIAL_TRANSPARANCY_FROM_MTL, slicing_parts=['blade']))
+
+            self.scene_objects.append(
+                SlicingSceneObject(bullet_client, filename, [0.83, -0.27, 0.9],
+                                   self._p.getQuaternionFromEuler([np.deg2rad(90), 0, np.deg2rad(90)]),
                             flags=pybullet.URDF_USE_MATERIAL_COLORS_FROM_MTL |
                                   pybullet.URDF_USE_MATERIAL_TRANSPARANCY_FROM_MTL, slicing_parts=['blade']))
 
@@ -109,10 +120,14 @@ class PickKnifeAndCutScene(Scene):
             # filename = os.path.join(os.path.dirname(__file__), "..", "assets", "things", "cubes",
             #                         "cube_target_no_collision.urdf")
             # self.scene_objects.append(SceneObject(bullet_client, filename, [0.8, -0.4, 0.70]))
-            # #
+            # # #
             filename = os.path.join(os.path.dirname(__file__), "..", "assets", "things", "cubes",
                                     "cube_concave.urdf")
             self.scene_objects.append(SlicableSceneObject(bullet_client, filename, [0.8, 0.3, 0.70], removable=True))
+
+            filename = os.path.join(os.path.dirname(__file__), "..", "assets", "things", "cubes",
+                                    "cube_concave.urdf")
+            self.scene_objects.append(SlicableSceneObject(bullet_client, filename, [0.82, -0.22, 0.70], removable=True))
 
         # Checks if any non-removable object are being loaded after removable objects.
         if any(map(operator.not_, [__.removable for __ in self.scene_objects[
@@ -139,7 +154,7 @@ class PickKnifeAndCutScene(Scene):
         """
 
         """ Handle the knife blade collision """
-        for scene_object in self.scene_objects:
+        for scene_object in list(reversed([_ for _ in self.scene_objects if not _.removed])):
             scene_object.calc_state(self)
 
         return 0
@@ -155,11 +170,13 @@ class PickKnifeAndCutScene(Scene):
 
         :return:
         """
-        for scene_object in self.scene_objects:
+        for scene_object in reversed(sorted(self.scene_objects, key=lambda x: x.bodyIndex)):
             if scene_object.removable and not scene_object.removed:
                 # So I think it doesnt like orphans
                 self._p.removeBody(scene_object.bodyIndex)
                 scene_object.removed = True
+                if not scene_object.reloadable:
+                    self.scene_objects.remove(scene_object)
 
 # class PickKnifeAndCutScene(Scene):
 #     """

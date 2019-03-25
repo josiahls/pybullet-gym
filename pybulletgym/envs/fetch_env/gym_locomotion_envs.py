@@ -57,7 +57,6 @@ class FetchPickKnifeAndCutEnv(BaseBulletEnv, ABC):
         # This is done to avoid joint conflicts.
         # TODO investigate object id assignment of loadURDF.
         # Do this to avoid accidentally assigning a cube to a 25 joint robot when re-loading removed objects
-        self.scene.dynamic_object_load(self._p)
         self.camera._p = self._p
         self.potential = self.robot.calc_potential(scene=self.scene)
 
@@ -76,6 +75,8 @@ class FetchPickKnifeAndCutEnv(BaseBulletEnv, ABC):
 
         if self.stateId < 0:
             self.stateId = self._p.saveState()
+
+        self.scene.dynamic_object_load(self._p)
 
     def step(self, a):
 
