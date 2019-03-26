@@ -9,7 +9,7 @@ import utils
 
 
 # Load the OpenAI gym env
-env = gym.make('FetchPickKnifeAndCutEnv-v0')  # type: gym.Env
+env = gym.make('FetchPickKnifeAndCutTestEnv-v0')  # type: gym.Env
 
 # Render the display and perform reset operations that set up the state
 env.render(mode="human")

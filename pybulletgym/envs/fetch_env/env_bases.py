@@ -123,7 +123,6 @@ class BaseBulletEnv(gym.Env):
         reset = _reset
         seed = _seed
 
-
 class Camera:
     def __init__(self):
         pass

@@ -6,8 +6,6 @@ from robot_bases import BodyPart
 
 
 class SceneObject(BodyPart):
-    children: List[BodyPart]
-
     def __init__(self, bullet_client: BulletClient, filename: str = None, position: list = None, orientation: list = None,
                  flags=0, removable=False, reloadable=True):
         self.filename = filename
@@ -59,6 +57,33 @@ class SceneObject(BodyPart):
     def calc_state(self, scene):
         return 0
 
+    def _closest_index_array_within_limit(self, array, value, limit):
+        """
+        This is a utility function for getting the closest index to a value within a limit.
+
+        The goal of this method to for making finding axis closest to 0 and 90 degrees a little easier.
+
+        Ignores negative / positive values. Treats calculations in absolute value space.
+
+        :param array:
+        :param value:
+        :param limit:
+        :return: -1 if no axis is close enough to the value within the given limit, else the index
+        """
+        index = (np.abs(array - value)).argmin()
+        return index if abs(array[index]) < limit else -1
+
+    def _is_value_within_limit(self, array, index, value, limit):
+        """
+
+        :param eval:
+        :param index
+        :param value:
+        :param limit:
+        :return:
+        """
+        return index if abs(np.abs(array[index]) - value) < limit else -1
+
 
 class SlicingSceneObject(SceneObject):
     def __init__(self, bullet_client: BulletClient, filename: str = None, position: list = None, orientation: list = None,
@@ -94,6 +119,7 @@ class SlicableSceneObject(SceneObject):
         """
         self._p = bullet_client
         self.filename = filename
+        self.slicing_cool_down = 5
         if filename is None:
             create_visual_shape_params = {_: create_visual_shape_params[_] for _ in create_visual_shape_params if
                                           create_visual_shape_params[_] is not None}
@@ -117,6 +143,7 @@ class SlicableSceneObject(SceneObject):
 
     def reload(self):
         if self.filename is not None and self.removed and self.removable and self.reloadable:
+            self.slicing_cool_down = 5
             super(SlicableSceneObject, self).reload()
         elif self.removed and self.removable and self.reloadable:
             collision_id = self._p.createCollisionShape(**self.create_collision_params)
@@ -124,6 +151,7 @@ class SlicableSceneObject(SceneObject):
             self.create_body_params['baseCollisionShapeIndex'] = collision_id
             self.create_body_params['baseVisualShapeIndex'] = visual_shape_id
             self.bodyIndex = self._p.createMultiBody(**self.create_body_params)
+            self.slicing_cool_down = 5
 
     def calc_state(self, scene):
         """
@@ -139,36 +167,70 @@ class SlicableSceneObject(SceneObject):
         if self.removed:
             return 0
 
-        for slicing_object in [_ for _ in scene.scene_objects if type(_) is SlicingSceneObject
-                               if not _.removed]:
-            for slicing_joint in slicing_object.slice_parts:
-                # Get a list of the overlapping objects
-                collision = self._p.getOverlappingObjects(slicing_joint.get_position(), self.get_position())
-                if collision is not None:
-                    print(f'Collision is happening at {self.body_name}')
-                    # Get the identifying ids for both interacting objects
-                    slicing_joint_id = (slicing_joint.bodyIndex, slicing_joint.bodyPartIndex)
-                    slicable_object_id = (self.bodyIndex, self.bodyPartIndex)
-                    # Get the contact points
-                    contacts_to_sliceable = self._p.getContactPoints(slicable_object_id[0], slicing_joint_id[0],
-                                                                     slicable_object_id[1], slicing_joint_id[1])
-                    contacts_to_slicing = self._p.getContactPoints(slicing_joint_id[0], slicable_object_id[0],
-                                                                   slicing_joint_id[1], slicable_object_id[1])
+        if self.slicing_cool_down != 0:
+            self.slicing_cool_down -= 1
+        else:
+            # If the object has cooled down, start checking for slicing events
+            for slicing_object in [_ for _ in scene.scene_objects if type(_) is SlicingSceneObject
+                                   if not _.removed]:
+                for slicing_joint in slicing_object.slice_parts:
+                    # Get a list of the overlapping objects
+                    collision = self._p.getOverlappingObjects(slicing_joint.get_position(), self.get_position())
+                    if collision is not None:
+                        # print(f'Collision is happening at {self.body_name}')
+                        # Get the identifying ids for both interacting objects
+                        slicing_joint_id = (slicing_joint.bodyIndex, slicing_joint.bodyPartIndex)
+                        slicable_object_id = (self.bodyIndex, self.bodyPartIndex)
+                        # Get the contact points
+                        contacts_to_sliceable = self._p.getContactPoints(slicable_object_id[0], slicing_joint_id[0],
+                                                                         slicable_object_id[1], slicing_joint_id[1])
+                        contacts_to_slicing = self._p.getContactPoints(slicing_joint_id[0], slicable_object_id[0],
+                                                                       slicing_joint_id[1], slicable_object_id[1])
 
-                    # contacts_to_sliceable[0][11] < -0.8 is the specific downward force that the knife (body B) is applying to
-                    # a slicable object A. This prevents "side" slicing. Only the sharp part of the blade is valid
-                    if len(contacts_to_sliceable) > 0 and contacts_to_slicing[0][7][2] > 0.3:
-                        print(f'Full Collision is happening at {self.body_name}')
-                        """ Do Decomposition """
-                        # Get information on slicable object
-                        slicable_object_data = self._p.getCollisionShapeData(*slicable_object_id)[0]
-                        slicable_position = self.get_position()
-                        slicable_orientation = self.get_orientation()
-                        slicable_base_mesh = slicable_object_data[3]
+                        # contacts_to_sliceable[0][11] < -0.8 is the specific downward force that the knife (body B) is applying to
+                        # a slicable object A. This prevents "side" slicing. Only the sharp part of the blade is valid
+                        if len(contacts_to_sliceable) == 1 and contacts_to_slicing[0][9] > 0.4 and abs(contacts_to_slicing[0][11][1]) > 0.8:
+                            # print(f'Full Collision is happening at {self.body_name}')
+                            """ Do Decomposition """
+                            # Get information on slicable object
+                            slicable_object_data = self._p.getCollisionShapeData(*slicable_object_id)[0]
+                            slicable_position = self.get_position()
+                            slicable_orientation = self._p.getEulerFromQuaternion(self.get_orientation())
+                            slicable_base_mesh = slicable_object_data[3]
+                            # Get slicing orientation
+                            slicing_orientation = self._p.getEulerFromQuaternion(slicing_joint.get_orientation())
+                            # Get slicing relative orientation
+                            slicing_rel_orientation = np.subtract(slicing_orientation, slicable_orientation)
+                            axis = 0
+                            """ Singular axis rotations (others are 0) """
+                            # Y rotated 90 degrees, keep Y whether it is 90 or 0
+                            axis = 0 if self._is_value_within_limit(slicing_rel_orientation, 0, 1.5, 0.2) != -1 else axis
+                            # X rotated 90 degrees, make Z
+                            axis = 2 if self._is_value_within_limit(slicing_rel_orientation, 1, 1.5, 0.2) != -1 else axis
+                            # Z rotated 90 degrees, make X
+                            axis = 1 if self._is_value_within_limit(slicing_rel_orientation, 2, 1.5, 0.2) != -1 else axis
+                            """ Combined axis rotations """
+                            # For Y
+                            axis = 2 if self._is_value_within_limit(slicing_rel_orientation, 0, 1.5, 0.2) != -1 and \
+                                        self._is_value_within_limit(slicing_rel_orientation, 1, 1.5, 0.2) != -1 else axis
+                            axis = 1 if self._is_value_within_limit(slicing_rel_orientation, 0, 1.5, 0.2) != -1 and \
+                                        self._is_value_within_limit(slicing_rel_orientation, 2, 1.5, 0.2) != -1 else axis
+                            # For X
+                            axis = 1 if self._is_value_within_limit(slicing_rel_orientation, 1, 1.5, 0.2) != -1 and \
+                                        self._is_value_within_limit(slicing_rel_orientation, 2, 1.5, 0.2) != -1 else axis
+                            axis = 2 if self._is_value_within_limit(slicing_rel_orientation, 1, 1.5, 0.2) != -1 and \
+                                        self._is_value_within_limit(slicing_rel_orientation, 0, 1.5, 0.2) != -1 else axis
+                            axis = 2 if self._is_value_within_limit(slicing_rel_orientation, 0, 1.5, 0.2) != -1 and \
+                                        self._is_value_within_limit(slicing_rel_orientation, 1, 1.5, 0.2) != -1 and \
+                                        self._is_value_within_limit(slicing_rel_orientation, 2, 1.5, 0.2) != -1 else axis
 
-                        self.split(np.argmax(np.abs(contacts_to_sliceable[0][11])),
-                                   slicable_base_mesh, slicable_position,
-                                   slicable_orientation, scene, contacts_to_sliceable)
+                            # Finally, if the knive's contact point's normal is parallel to the exis, then
+                            if axis == np.argmax(np.abs(contacts_to_slicing[0][7])):
+                                # print('The knife is not allowed to cut perpendicular to its blade direction')
+                                break
+
+                            self.split(axis, slicable_base_mesh, slicable_position, slicable_orientation, scene,
+                                       contacts_to_sliceable)
 
     def split(self, axis, original_mesh, original_position, original_orientation, scene, contacts):
         print(str(scene.scene_objects))
