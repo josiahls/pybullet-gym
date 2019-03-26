@@ -3,7 +3,9 @@ from abc import ABC
 import numpy as np
 from pybullet_envs.bullet.bullet_client import BulletClient
 import pybullet
-from .scene_manipulators import PickKnifeAndCutScene
+
+from scene_object_bases import TargetSceneObject
+from .scene_manipulators import PickKnifeAndCutTestScene, PickAndMoveScene
 from .env_bases import BaseBulletEnv
 from .robot_locomotors import FetchURDF
 from pybullet_envs.bullet import bullet_client
@@ -25,7 +27,7 @@ class FetchPickKnifeAndCutTestEnv(BaseBulletEnv, ABC):
 
     def create_single_player_scene(self, _p: BulletClient):
 
-        self.pick_and_place_scene = PickKnifeAndCutScene(_p, gravity=9.8, timestep=0.0165 / 4, frame_skip=4)
+        self.pick_and_place_scene = PickKnifeAndCutTestScene(_p, gravity=9.8, timestep=0.0165 / 4, frame_skip=4)
         return self.pick_and_place_scene
 
     def _reset(self):
@@ -116,14 +118,14 @@ class FetchPickKnifeAndCutTestEnv(BaseBulletEnv, ABC):
             print(joints_at_limit_cost)
 
         """ Grasp Reward (straight line distance) """
-        l_grasp_distance = 0 # np.linalg.norm(np.subtract(self.robot.l_gripper_finger_link.get_position(),
-                                                     # self.scene.objects_of_interest['knife.urdf'].get_position()))
-        r_grasp_distance = 0 # np.linalg.norm(np.subtract(self.robot.r_gripper_finger_link.get_position(),
-                                                     # self.scene.objects_of_interest['knife.urdf'].get_position()))
+        l_grasp_distance = 0  # np.linalg.norm(np.subtract(self.robot.l_gripper_finger_link.get_position(),
+        # self.scene.objects_of_interest['knife.urdf'].get_position()))
+        r_grasp_distance = 0  # np.linalg.norm(np.subtract(self.robot.r_gripper_finger_link.get_position(),
+        # self.scene.objects_of_interest['knife.urdf'].get_position()))
 
         """ Distance of knife edge to target cube """
-        knife_distance = 0#np.linalg.norm(np.subtract(self.scene.objects_of_interest['knife.urdf'].get_position(),
-                           #                         self.scene.objects_of_interest['cube_target.urdf'].get_position()))
+        knife_distance = 0  # np.linalg.norm(np.subtract(self.scene.objects_of_interest['knife.urdf'].get_position(),
+        #                         self.scene.objects_of_interest['cube_target.urdf'].get_position()))
 
         self.rewards = [
             # alive,
@@ -147,6 +149,7 @@ class FetchPickKnifeAndCutTestEnv(BaseBulletEnv, ABC):
         x, y, z = self.robot.body_xyz
         self.camera_x = 0.98 * self.camera_x + (1 - 0.98) * x
         self.camera.move_and_look_at(self.camera_x, y - 2.0, 1.4, x, y, 1.0)
+
 
 class FetchMoveBlock(BaseBulletEnv, ABC):
 
@@ -158,12 +161,13 @@ class FetchMoveBlock(BaseBulletEnv, ABC):
         self.pick_and_place_scene = None
         self.potential = 0
         self.rewards = []
+        self.elapsed_time = 0
         self.stateId = -1
         self._p = None
 
     def create_single_player_scene(self, _p: BulletClient):
 
-        self.pick_and_place_scene = PickKnifeAndCutScene(_p, gravity=9.8, timestep=0.0165 / 4, frame_skip=4)
+        self.pick_and_place_scene = PickAndMoveScene(_p, gravity=9.8, timestep=0.0165 / 4, frame_skip=4)
         return self.pick_and_place_scene
 
     def _reset(self):
@@ -216,16 +220,22 @@ class FetchMoveBlock(BaseBulletEnv, ABC):
 
         self.scene.dynamic_object_load(self._p)
 
+        # Reset rewards
+        self.elapsed_time = 0
+
     def step(self, a):
 
+        """ UPDATE ACTIONS """
         if not self.scene.multiplayer:  # if multiplayer, action first applied to all robots, then global step() called, then _step() for all robots with the same actions
             self.robot.apply_action(a)
             self.scene.global_step()
 
+        """ CALCULATE STATES """
         # also calculates self.joints_at_limit
         state = self.robot.calc_state()
         object_states = self.scene.calc_state()
 
+        """ CALCULATE REWARDS """
         # For no, the robot will always be alive
         # Otherwise, if the robot is upright, reward it
         alive = float(self.robot.alive_bonus(state[0] + self.robot.initial_z, self.robot.body_rpy[
@@ -235,6 +245,12 @@ class FetchMoveBlock(BaseBulletEnv, ABC):
         if not np.isfinite(state).all():
             print("~INF~", state)
             done = True
+        if done:
+            print(f'Done because: state[0] is {state[0]} and the initial z is: {self.robot.initial_z}')
+
+
+        # Punish higher amounts of time
+        self.elapsed_time -= 0.001
 
         # This is the closeness to the goal. this will be determined based on closeness to the knife
         potential_old = self.potential
@@ -254,22 +270,40 @@ class FetchMoveBlock(BaseBulletEnv, ABC):
             print(joints_at_limit_cost)
 
         """ Grasp Reward (straight line distance) """
-        l_grasp_distance = 0 # np.linalg.norm(np.subtract(self.robot.l_gripper_finger_link.get_position(),
-                                                     # self.scene.objects_of_interest['knife.urdf'].get_position()))
-        r_grasp_distance = 0 # np.linalg.norm(np.subtract(self.robot.r_gripper_finger_link.get_position(),
-                                                     # self.scene.objects_of_interest['knife.urdf'].get_position()))
+        object_positions = []
+        for scene_object in list(reversed([_ for _ in self.scene.scene_objects if not _.removed])):
+            if type(scene_object) is TargetSceneObject:
+                object_positions.append(scene_object.get_position())
+
+        l_grasp_distance = np.linalg.norm(np.subtract(self.robot.l_gripper_finger_link.get_position(), object_positions), axis=1)
+        r_grasp_distance = np.linalg.norm(np.subtract(self.robot.r_gripper_finger_link.get_position(), object_positions), axis=1)
+
+        contact_events = [0]
+        for scene_object in list(reversed([_ for _ in self.scene.scene_objects if not _.removed])):
+            if type(scene_object) is TargetSceneObject:
+                c1 = self._p.getContactPoints(self.robot.l_gripper_finger_link.bodyIndex, scene_object.bodyIndex,
+                                              self.robot.l_gripper_finger_link.bodyPartIndex, scene_object.bodyPartIndex)
+                c2 = self._p.getContactPoints(self.robot.r_gripper_finger_link.bodyIndex, scene_object.bodyIndex,
+                                              self.robot.r_gripper_finger_link.bodyPartIndex, scene_object.bodyPartIndex)
+                if c1 is not None:
+                    contact_events.append(1)
+                if c2 is not None:
+                    contact_events.append(1)
+
 
         """ Distance of knife edge to target cube """
-        knife_distance = 0#np.linalg.norm(np.subtract(self.scene.objects_of_interest['knife.urdf'].get_position(),
-                           #                         self.scene.objects_of_interest['cube_target.urdf'].get_position()))
+        total_sum_target_distance = np.sum(object_states)
 
         self.rewards = [
-            # alive,
+            alive,
+            sum(contact_events),
+            self.elapsed_time,
+            -1 * total_sum_target_distance,
             # progress,
             # electricity_cost,
             joints_at_limit_cost,
-            -1 * l_grasp_distance,
-            -1 * r_grasp_distance
+            -1 * sum(l_grasp_distance),
+            -1 * sum(r_grasp_distance)
         ]
         if debugmode:
             print("rewards=")
@@ -285,4 +319,3 @@ class FetchMoveBlock(BaseBulletEnv, ABC):
         x, y, z = self.robot.body_xyz
         self.camera_x = 0.98 * self.camera_x + (1 - 0.98) * x
         self.camera.move_and_look_at(self.camera_x, y - 2.0, 1.4, x, y, 1.0)
-
