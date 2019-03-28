@@ -242,12 +242,34 @@ class PickAndMoveScene(Scene):
         for scene_object in self.scene_objects:
             scene_object.reload()
 
+        # Process target positions
         for scene_object in self.scene_objects:
-            scene_object.reset_position((
-                np.random.uniform(.55, 1),
-                np.random.uniform(-0.5, .51),
-                np.random.uniform(.7, 1.2)
-            ))
+            if scene_object.filename.__contains__('cube_target_no_collision.urdf'):
+                scene_object.reset_position((
+                    np.random.uniform(.55, 1),
+                    np.random.uniform(-0.5, .51),
+                    np.random.uniform(.7, .8)
+                ))
+        # Process object positions
+        for scene_object in self.scene_objects:
+            if scene_object.filename.__contains__('cube_concave.urdf'):
+                target_positions = [_.get_position() for _ in self.scene_objects
+                                    if _.filename.__contains__('cube_target_no_collision.urdf')]
+
+                object_position = (
+                    np.random.uniform(.55, 1),
+                    np.random.uniform(-0.5, .51),
+                    np.random.uniform(.7, .8)
+                )
+                while np.linalg.norm(np.subtract(target_positions, object_position)) < .5:
+                    object_position = (
+                        np.random.uniform(.55, 1),
+                        np.random.uniform(-0.5, .51),
+                        np.random.uniform(.7, .8)
+                    )
+
+                scene_object.reset_position(object_position)
+
 
     def calc_state(self):
         """

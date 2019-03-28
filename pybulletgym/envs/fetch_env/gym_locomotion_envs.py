@@ -4,7 +4,7 @@ import numpy as np
 from pybullet_envs.bullet.bullet_client import BulletClient
 import pybullet
 
-from scene_object_bases import TargetSceneObject
+from scene_object_bases import TargetSceneObject, SlicableSceneObject
 from .scene_manipulators import PickKnifeAndCutTestScene, PickAndMoveScene
 from .env_bases import BaseBulletEnv
 from .robot_locomotors import FetchURDF
@@ -272,7 +272,7 @@ class FetchMoveBlock(BaseBulletEnv, ABC):
         """ Grasp Reward (straight line distance) """
         object_positions = []
         for scene_object in list(reversed([_ for _ in self.scene.scene_objects if not _.removed])):
-            if type(scene_object) is TargetSceneObject:
+            if type(scene_object) is SlicableSceneObject:
                 object_positions.append(scene_object.get_position())
 
         l_grasp_distance = np.linalg.norm(np.subtract(self.robot.l_gripper_finger_link.get_position(), object_positions), axis=1)
@@ -290,6 +290,11 @@ class FetchMoveBlock(BaseBulletEnv, ABC):
                 if c2 is not None:
                     contact_events.append(1)
 
+        object_to_target_distances = []
+        for scene_object in list(reversed([_ for _ in self.scene.scene_objects if not _.removed])):
+            if type(scene_object) is TargetSceneObject:
+                for position in object_positions:
+                    object_to_target_distances.append(np.linalg.norm(scene_object.get_position() - position))
 
         """ Distance of knife edge to target cube """
         total_sum_target_distance = np.sum(object_states)
@@ -303,7 +308,8 @@ class FetchMoveBlock(BaseBulletEnv, ABC):
             # electricity_cost,
             joints_at_limit_cost,
             -1 * sum(l_grasp_distance),
-            -1 * sum(r_grasp_distance)
+            -1 * sum(r_grasp_distance),
+            -1 * sum(object_to_target_distances)
         ]
         if debugmode:
             print("rewards=")
