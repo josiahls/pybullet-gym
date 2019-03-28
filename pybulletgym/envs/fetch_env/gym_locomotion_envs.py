@@ -163,6 +163,7 @@ class FetchMoveBlockEnv(BaseBulletEnv, ABC):
         self.rewards = []
         self.elapsed_time = 0
         self.stateId = -1
+        self.max_state_space_object_size = 30
         self._p = None
 
     def create_single_player_scene(self, _p: BulletClient):
@@ -222,6 +223,16 @@ class FetchMoveBlockEnv(BaseBulletEnv, ABC):
 
         # Reset rewards
         self.elapsed_time = 0
+
+    def get_state_space_size(self):
+        state = self.robot.calc_state()
+        object_states, distances = self.scene.calc_state()
+        for object_state in object_states:
+            np.hstack((state, object_state))
+        for i in range(self.max_state_space_object_size - len(object_states)):
+            np.hstack((state, np.zeros((1, len(list(self.scene.object_features.values()))))))
+
+        return state.shape
 
     def step(self, a):
 
