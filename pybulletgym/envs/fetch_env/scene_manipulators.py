@@ -6,7 +6,7 @@ from typing import List
 
 import numpy as np
 
-from scene_object_bases import SceneObject, SlicingSceneObject, SlicableSceneObject, TargetSceneObject
+from .scene_object_bases import SceneObject, SlicingSceneObject, SlicableSceneObject, TargetSceneObject
 from .scene_bases import Scene
 
 currentdir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))

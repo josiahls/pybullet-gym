@@ -3,7 +3,7 @@ from pybullet_envs.bullet.bullet_client import BulletClient
 from pybullet_envs.scene_abstract import Scene
 import os
 from fetch_env.robot_bases import URDFBasedRobot
-from robot_bases import Joint
+from .robot_bases import Joint
 import pybullet
 from pybullet_envs.bullet import bullet_client
 
@@ -76,7 +76,7 @@ class FetchURDF(URDFBasedRobot):
         i = 0
         for n, j in enumerate(self.ordered_joints):
             if j.power_coef != 0:  # in case the ignored joints are added, they have 0 power
-                j.set_motor_torque(self.power * j.power_coef * float(np.clip(*a[n - i], -1, +1)))
+                j.set_motor_torque(self.power * j.power_coef * float(np.clip(a[n - i], -1, +1)))
             else:
                 i += 1
 

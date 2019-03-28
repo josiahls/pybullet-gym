@@ -224,6 +224,7 @@ class SDFBasedRobot(XmlBasedRobot):
 
 class BodyPart:
     def __init__(self, bullet_client, body_name, bodies, bodyIndex, bodyPartIndex):
+        self.body_name = body_name
         self.bodies = bodies
         self._p = bullet_client
         self.bodyIndex = bodyIndex

@@ -2,7 +2,7 @@ from typing import List
 
 from pybullet_utils.bullet_client import BulletClient
 import numpy as np
-from robot_bases import BodyPart
+from .robot_bases import BodyPart
 
 
 class SceneObject(BodyPart):

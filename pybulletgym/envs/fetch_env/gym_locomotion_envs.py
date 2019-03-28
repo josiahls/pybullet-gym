@@ -4,7 +4,7 @@ import numpy as np
 from pybullet_envs.bullet.bullet_client import BulletClient
 import pybullet
 
-from scene_object_bases import TargetSceneObject, SlicableSceneObject
+from .scene_object_bases import TargetSceneObject, SlicableSceneObject
 from .scene_manipulators import PickKnifeAndCutTestScene, PickAndMoveScene
 from .env_bases import BaseBulletEnv
 from .robot_locomotors import FetchURDF
