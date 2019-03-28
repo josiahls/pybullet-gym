@@ -1,32 +1,22 @@
-from time import sleep
-
-import gym
-import pybulletgym.envs
-import numpy as np
-import pybullet as p
-
-import utils
-import gym
 import math
+import pybullet as p
 import random
-import numpy as np
-import matplotlib
-import matplotlib.pyplot as plt
-from collections import namedtuple
 from itertools import count
+
+import pybulletgym.envs
+import gym
+import numpy as np
+import torch
+import torch.nn.functional as F
+import torch.optim as optim
+import torchvision.transforms as T
 from PIL import Image
 
-import torch
-import torch.nn as nn
-import torch.optim as optim
-import torch.nn.functional as F
-import torchvision.transforms as T
-
-
+import utils
 # Load the OpenAI gym env
 from MoveAgent import DQN, ReplayMemory, Transition
 
-env = gym.make('FetchMoveBlock-v0')  # type: gym.Env
+env = gym.make('FetchMoveBlockEnv-v0')  # type: gym.Env
 
 # Render the display and perform reset operations that set up the state
 env.render(mode="human")
@@ -156,27 +146,7 @@ for i in range(p.getNumBodies()):
         baseId = i
         print("found base")
 
-# Start matplotlib to show the reward progression
-# plotter = utils.Plotter()
-#
-# for i in range(50):
-#     for _ in range(50):
-#         # print(env.render(mode="human"))
-#         # results = env.step(env.action_space.sample())
-#
-#         # fetchPos, fetchOrn = p.getBasePositionAndOrientation(baseId)
-#         # distance = 1.5
-#         # yaw = 90
-#         # p.resetDebugVisualizerCamera(distance, yaw, -45, fetchPos)
-#
-#         results = env.step(np.zeros(env.action_space.high.shape))
-#
-#         plotter.live_plotter(results[1])
-#         sleep(0.02)
-#
-#     print('Resetting')
-#     env.reset()
-#     sleep(1)
+
 plotter = utils.Plotter()
 
 num_episodes = 150

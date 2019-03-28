@@ -7,7 +7,7 @@ from .robot_bases import BodyPart
 
 class SceneObject(BodyPart):
     def __init__(self, bullet_client: BulletClient, filename: str = None, position: list = None, orientation: list = None,
-                 flags=0, removable=False, reloadable=True):
+                 flags=0, removable=False, reloadable=True, type_id=0):
         self.filename = filename
         if self.filename is not None:
             # Load the object mesh
@@ -37,6 +37,7 @@ class SceneObject(BodyPart):
         # replacing it will slices of it. But we want to reload the original object, and not reload the slices
         self.removable = removable
         self.reloadable = reloadable
+        self.type_id = type_id
         self.removed = False
 
     def reload(self):
@@ -124,7 +125,7 @@ class TargetSceneObject(SceneObject):
             self.reloadable = reloadable
             self.removed = False
 
-        super().__init__(bullet_client, filename, position, orientation, flags, removable, reloadable)
+        super().__init__(bullet_client, filename, position, orientation, flags, removable, reloadable, 1)
 
     def set_objects_to_compare(self, objects_to_compare):
         self.objects_to_compare = objects_to_compare
@@ -137,7 +138,7 @@ class TargetSceneObject(SceneObject):
 class SlicingSceneObject(SceneObject):
     def __init__(self, bullet_client: BulletClient, filename: str = None, position: list = None, orientation: list = None,
                  flags=0, removable=False, reloadable=True, slicing_parts: List[str] = None):
-        super().__init__(bullet_client, filename, position, orientation, flags, removable, reloadable)
+        super().__init__(bullet_client, filename, position, orientation, flags, removable, reloadable, 2)
 
         # So we want to define: What parts can slice, and on what axis, direction, and deviation is that slicing valid
         if slicing_parts is None:
@@ -188,7 +189,7 @@ class SlicableSceneObject(SceneObject):
             self.reloadable = reloadable
             self.removed = False
 
-        super().__init__(bullet_client, filename, position, orientation, flags, removable, reloadable)
+        super().__init__(bullet_client, filename, position, orientation, flags, removable, reloadable, 3)
 
     def reload(self):
         if self.filename is not None and self.removed and self.removable and self.reloadable:

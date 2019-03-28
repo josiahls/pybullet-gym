@@ -2,6 +2,7 @@ import inspect
 import operator
 import os
 import pybullet
+from collections import namedtuple, OrderedDict
 from typing import List
 
 import numpy as np
@@ -86,21 +87,23 @@ class PickKnifeAndCutTestScene(Scene):
             filename = os.path.join(os.path.dirname(__file__), "..", "assets", "things", "knives",
                                     "knife.urdf")
             self.scene_objects.append(SlicingSceneObject(bullet_client, filename, [0.70, 0.28, 0.9],
-                                      self._p.getQuaternionFromEuler([np.deg2rad(90), 0, np.deg2rad(-90)]),
-                                      flags=pybullet.URDF_USE_MATERIAL_COLORS_FROM_MTL |
-                                      pybullet.URDF_USE_MATERIAL_TRANSPARANCY_FROM_MTL, slicing_parts=['blade']))
+                                                         self._p.getQuaternionFromEuler(
+                                                             [np.deg2rad(90), 0, np.deg2rad(-90)]),
+                                                         flags=pybullet.URDF_USE_MATERIAL_COLORS_FROM_MTL |
+                                                               pybullet.URDF_USE_MATERIAL_TRANSPARANCY_FROM_MTL,
+                                                         slicing_parts=['blade']))
 
             self.scene_objects.append(
                 SlicingSceneObject(bullet_client, filename, [0.85, -0.29, 0.8],
                                    self._p.getQuaternionFromEuler([np.deg2rad(90), 0, 0]),
-                            flags=pybullet.URDF_USE_MATERIAL_COLORS_FROM_MTL |
-                                  pybullet.URDF_USE_MATERIAL_TRANSPARANCY_FROM_MTL, slicing_parts=['blade']))
+                                   flags=pybullet.URDF_USE_MATERIAL_COLORS_FROM_MTL |
+                                         pybullet.URDF_USE_MATERIAL_TRANSPARANCY_FROM_MTL, slicing_parts=['blade']))
 
             self.scene_objects.append(
                 SlicingSceneObject(bullet_client, filename, [0.90, -0.24, 0.9],
                                    self._p.getQuaternionFromEuler([np.deg2rad(90), 0, np.deg2rad(90)]),
-                            flags=pybullet.URDF_USE_MATERIAL_COLORS_FROM_MTL |
-                                  pybullet.URDF_USE_MATERIAL_TRANSPARANCY_FROM_MTL, slicing_parts=['blade']))
+                                   flags=pybullet.URDF_USE_MATERIAL_COLORS_FROM_MTL |
+                                         pybullet.URDF_USE_MATERIAL_TRANSPARANCY_FROM_MTL, slicing_parts=['blade']))
 
     def dynamic_object_load(self, bullet_client: pybullet):
         """
@@ -232,7 +235,10 @@ class PickAndMoveScene(Scene):
 
         # Checks if any non-removable object are being loaded after removable objects.
         if any([_.removable for _ in self.scene_objects]) and any(map(operator.not_,
-                [__.removable for __ in self.scene_objects[[_.removable for _ in self.scene_objects].index(True):]])):
+                                                                      [__.removable for __ in self.scene_objects[
+                                                                                              [_.removable for _ in
+                                                                                               self.scene_objects].index(
+                                                                                                  True):]])):
             raise Exception('You have an object that is not removable being loaded after removable objects.'
                             ' For now, you need to load non-removable objects before removable ones. This is due to'
                             ' bullet3 currently overriding removable objects the later loaded non-removable objects.'
@@ -270,7 +276,6 @@ class PickAndMoveScene(Scene):
 
                 scene_object.reset_position(object_position)
 
-
     def calc_state(self):
         """
         We want to update the states of the objects of interest during manipulation.
@@ -280,17 +285,44 @@ class PickAndMoveScene(Scene):
         We also want to be able to add advanced object behaviors such as breaking into smaller
         pieces.
 
-        :return:
+        the scene state is defined almost as an image where the dims are:
+
+        Max Num Objects x Features
+
+        :return: The scene state.
         """
         states = []
+        old_states = []
 
         """ Handle the knife blade collision """
         for scene_object in list(reversed([_ for _ in self.scene_objects if not _.removed])):
+            features = {'pos_x': scene_object.get_position()[0], 'pos_y': scene_object.get_position()[1],
+                        'pos_z': scene_object.get_position()[2],
+                        'or_x': self._p.getEulerFromQuaternion(scene_object.get_orientation())[0],
+                        'or_y': self._p.getEulerFromQuaternion(scene_object.get_orientation())[1],
+                        'or_z': self._p.getEulerFromQuaternion(scene_object.get_orientation())[2], 'width': 0,
+                        'height': 0, 'length': 0, 'radius': 0, 'obj_type': 0, 'obj_internal_state': 0}
+
+            # Get the collision information
+            collision_info = self._p.getCollisionShapeData(scene_object.bodyIndex, scene_object.bodyPartIndex)
+            if not collision_info:
+                collision_info = [[0, 0, 0, (0, 0, 0)]]
+            features['width'] = collision_info[0][3][0]
+            features['height'] = collision_info[0][3][1]
+            features['length'] = collision_info[0][3][2]
+            features['radius'] = collision_info[0][3][0]
+
+            # Set the types
+            features['obj_type'] = scene_object.type_id
+            features['obj_internal_state'] = 0
+
             if type(scene_object) is TargetSceneObject:
                 scene_object.set_objects_to_compare([o for o in self.scene_objects if type(o) is not TargetSceneObject])
-                states.append(scene_object.calc_state(self))
+                old_states.append(scene_object.calc_state(self))
+                features['obj_internal_state'] = scene_object.calc_state(self)[0]
+            states.append(tuple(features.values()))
 
-        return tuple(states)
+        return tuple(states), tuple(old_states)
 
     def _dynamic_object_clear(self):
         """

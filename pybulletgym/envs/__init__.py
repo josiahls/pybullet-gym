@@ -157,9 +157,9 @@ register(
 )
 
 register(
-	id='FetchMoveBlock-v0',
-	entry_point='pybulletgym.envs.fetch_env.gym_locomotion_envs:FetchMoveBlock',
-	max_episode_steps=1000000
+	id='FetchMoveBlockEnv-v0',
+	entry_point='pybulletgym.envs.fetch_env.gym_locomotion_envs:FetchMoveBlockEnv',
+	max_episode_steps=100000
 )
 
 

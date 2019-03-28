@@ -151,7 +151,7 @@ class FetchPickKnifeAndCutTestEnv(BaseBulletEnv, ABC):
         self.camera.move_and_look_at(self.camera_x, y - 2.0, 1.4, x, y, 1.0)
 
 
-class FetchMoveBlock(BaseBulletEnv, ABC):
+class FetchMoveBlockEnv(BaseBulletEnv, ABC):
 
     def __init__(self):
         self.robot = FetchURDF()
@@ -233,7 +233,7 @@ class FetchMoveBlock(BaseBulletEnv, ABC):
         """ CALCULATE STATES """
         # also calculates self.joints_at_limit
         state = self.robot.calc_state()
-        object_states = self.scene.calc_state()
+        object_states, distances = self.scene.calc_state()
 
         """ CALCULATE REWARDS """
         # For no, the robot will always be alive
@@ -297,7 +297,7 @@ class FetchMoveBlock(BaseBulletEnv, ABC):
                     object_to_target_distances.append(np.linalg.norm(scene_object.get_position() - position))
 
         """ Distance of knife edge to target cube """
-        total_sum_target_distance = np.sum(object_states)
+        total_sum_target_distance = np.sum(distances)
 
         self.rewards = [
             alive,
@@ -318,6 +318,9 @@ class FetchMoveBlock(BaseBulletEnv, ABC):
             print(sum(self.rewards))
         self.HUD(state, a, done)
         self.reward += sum(self.rewards)
+
+        for object_state in object_states:
+            np.hstack((state, object_state))
 
         return state, sum(self.rewards), bool(done), {}
 
