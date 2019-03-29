@@ -313,7 +313,7 @@ class FetchMoveBlockEnv(BaseBulletEnv, ABC):
 
         self.rewards = [
             alive,
-            # sum(contact_events),
+            sum(contact_events),
             self.elapsed_time,
             # -1 * total_sum_target_distance / 20,
             # progress,
@@ -323,7 +323,7 @@ class FetchMoveBlockEnv(BaseBulletEnv, ABC):
             joints_at_limit_cost,
             # -1 * sum(l_grasp_distance) / 20,
             # -1 * sum(r_grasp_distance) / 20,
-            # -1 * sum(object_to_target_distances) / 20
+            -1 * sum(object_to_target_distances)
         ]
         if debugmode:
             print("rewards=")
