@@ -192,6 +192,7 @@ class FetchMoveBlockEnv(BaseBulletEnv, ABC):
 
         self.frame = 0
         self.done = 0
+        self.elapsed_time = 0
         self.reward = 0
         dump = 0
         s = self.robot.reset(self._p, scene=self.scene)
@@ -225,12 +226,12 @@ class FetchMoveBlockEnv(BaseBulletEnv, ABC):
         self.elapsed_time = 0
 
     def get_state_space_size(self):
-        state = self.robot.calc_state()
+        state = self.robot.calc_state().reshape((1, -1))
         object_states, distances = self.scene.calc_state()
         for object_state in object_states:
-            np.hstack((state, object_state))
+            state = np.hstack((state, np.array(object_state).reshape((1, -1))))
         for i in range(self.max_state_space_object_size - len(object_states)):
-            np.hstack((state, np.zeros((1, len(list(self.scene.object_features.values()))))))
+            state = np.hstack((state, np.zeros((1, len(list(self.scene.object_features.values()))))))
 
         return state.shape
 
@@ -261,7 +262,7 @@ class FetchMoveBlockEnv(BaseBulletEnv, ABC):
 
 
         # Punish higher amounts of time
-        self.elapsed_time -= 0.001
+        self.elapsed_time += 0.1
 
         # This is the closeness to the goal. this will be determined based on closeness to the knife
         potential_old = self.potential
@@ -297,9 +298,9 @@ class FetchMoveBlockEnv(BaseBulletEnv, ABC):
                 c2 = self._p.getContactPoints(self.robot.r_gripper_finger_link.bodyIndex, scene_object.bodyIndex,
                                               self.robot.r_gripper_finger_link.bodyPartIndex, scene_object.bodyPartIndex)
                 if c1 is not None:
-                    contact_events.append(1)
+                    contact_events.append(.1)
                 if c2 is not None:
-                    contact_events.append(1)
+                    contact_events.append(.1)
 
         object_to_target_distances = []
         for scene_object in list(reversed([_ for _ in self.scene.scene_objects if not _.removed])):
@@ -312,15 +313,17 @@ class FetchMoveBlockEnv(BaseBulletEnv, ABC):
 
         self.rewards = [
             alive,
-            sum(contact_events),
+            # sum(contact_events),
             self.elapsed_time,
-            -1 * total_sum_target_distance,
+            # -1 * total_sum_target_distance / 20,
             # progress,
             # electricity_cost,
+            -1 * sum([abs(_) > 1 for _ in a]),
+            sum([abs(_) < 1 for _ in a]),
             joints_at_limit_cost,
-            -1 * sum(l_grasp_distance),
-            -1 * sum(r_grasp_distance),
-            -1 * sum(object_to_target_distances)
+            # -1 * sum(l_grasp_distance) / 20,
+            # -1 * sum(r_grasp_distance) / 20,
+            # -1 * sum(object_to_target_distances) / 20
         ]
         if debugmode:
             print("rewards=")
@@ -331,7 +334,7 @@ class FetchMoveBlockEnv(BaseBulletEnv, ABC):
         self.reward += sum(self.rewards)
 
         for object_state in object_states:
-            np.hstack((state, object_state))
+            state = np.hstack((state, object_state))
 
         return state, sum(self.rewards), bool(done), {}
 
