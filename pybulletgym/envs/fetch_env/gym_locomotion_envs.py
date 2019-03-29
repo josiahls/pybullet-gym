@@ -262,7 +262,7 @@ class FetchMoveBlockEnv(BaseBulletEnv, ABC):
 
 
         # Punish higher amounts of time
-        self.elapsed_time += 0.1
+        self.elapsed_time += 0.01
 
         # This is the closeness to the goal. this will be determined based on closeness to the knife
         potential_old = self.potential
@@ -318,8 +318,8 @@ class FetchMoveBlockEnv(BaseBulletEnv, ABC):
             # -1 * total_sum_target_distance / 20,
             # progress,
             # electricity_cost,
-            -1 * sum([abs(_) > 1 for _ in a]),
-            sum([abs(_) < 1 for _ in a]),
+            # -1 * sum([abs(_) > 1 for _ in a]),
+            # sum([abs(_) < 1 for _ in a]),
             joints_at_limit_cost,
             # -1 * sum(l_grasp_distance) / 20,
             # -1 * sum(r_grasp_distance) / 20,
