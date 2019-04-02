@@ -136,7 +136,8 @@ class FetchURDF(URDFBasedRobot):
         self.l_gripper_finger_link = self.parts['l_gripper_finger_link']
 
     def alive_bonus(self, z, pitch):
-        return +2 if 2 > z > -0.30 and pitch > -.1 else -1  # 2 here because 17 joints produce a lot of electricity cost just from policy noise, living must be better than dying
+        print(f'z is {z} pitch is: {pitch}')
+        return +2 if 2 > z > -0.2 and .28 > pitch > -.1 else -1  # 2 here because 17 joints produce a lot of electricity cost just from policy noise, living must be better than dying
 
 
 class FetchMJCF(MJCFBasedRobot):
