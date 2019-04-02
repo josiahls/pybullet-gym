@@ -531,6 +531,8 @@ class FetchCutBlockEnv_v1(BaseBulletEnv, ABC):
         for object_state in object_states:
             state = np.hstack((state, object_state))
 
+        done = True if sum(self.rewards) < -50 else done
+
         return state, sum(self.rewards), bool(done), {}
 
     def camera_adjust(self):
