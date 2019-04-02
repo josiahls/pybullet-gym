@@ -16,7 +16,7 @@ import utils
 # Load the OpenAI gym env
 from MoveAgent import DQN, ReplayMemory, Transition
 
-env = gym.make('FetchMoveBlockEnv-v0')  # type: gym.Env
+env = gym.make('FetchCutBlockEnv-v1')  # type: gym.Env
 
 # Render the display and perform reset operations that set up the state
 env.render(mode="human")
@@ -147,7 +147,7 @@ for i in range(p.getNumBodies()):
         print("found base")
 
 
-# plotter = utils.Plotter()
+plotter = utils.Plotter()
 
 num_episodes = 150
 for i_episode in range(num_episodes):
@@ -165,7 +165,7 @@ for i_episode in range(num_episodes):
         # Select and perform an action
         action = select_action(state)
         _, reward, done, _ = env.step(action.numpy()[0])
-        # plotter.live_plotter(reward)
+        plotter.live_plotter(reward)
 
         reward = torch.tensor([reward], device=device)
 

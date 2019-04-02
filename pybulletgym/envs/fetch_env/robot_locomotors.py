@@ -12,7 +12,7 @@ from pybulletgym.envs.mujoco.robot_bases import XmlBasedRobot, MJCFBasedRobot
 
 class FetchURDF(URDFBasedRobot):
 
-    def __init__(self, power=0.1):
+    def __init__(self, power=0.0001):
         URDFBasedRobot.__init__(self, "fetch/fetch_description/robots/fetch.urdf", "base_link", action_dim=25,
                                 obs_dim=70, self_collision=True)
         self.power = power
@@ -31,7 +31,6 @@ class FetchURDF(URDFBasedRobot):
         """ Update the manipulator fields. We have these are fields so they are easier to interface with """
         self.r_gripper_finger_link = None  # type: Joint
         self.l_gripper_finger_link = None  # type: Joint
-
 
     def calc_state(self):
         """
@@ -68,7 +67,8 @@ class FetchURDF(URDFBasedRobot):
 
         return np.concatenate([
             qpos.flat[1:],  # self.sim.data.qpos.flat[1:],
-            np.clip(qvel, -10, 10).flat  # self.sim.data.qvel.flat,
+            # np.clip(qvel, -1, 1).flat  # self.sim.data.qvel.flat,
+            np.array(qvel).flat
         ])
 
     def apply_action(self, a):
@@ -136,7 +136,7 @@ class FetchURDF(URDFBasedRobot):
         self.l_gripper_finger_link = self.parts['l_gripper_finger_link']
 
     def alive_bonus(self, z, pitch):
-        return +2 if 2 > z > -1.08 else -1  # 2 here because 17 joints produce a lot of electricity cost just from policy noise, living must be better than dying
+        return +2 if 2 > z > -0.30 and pitch > -.1 else -1  # 2 here because 17 joints produce a lot of electricity cost just from policy noise, living must be better than dying
 
 
 class FetchMJCF(MJCFBasedRobot):
