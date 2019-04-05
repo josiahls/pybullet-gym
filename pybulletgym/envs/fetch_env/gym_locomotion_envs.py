@@ -161,11 +161,17 @@ class BaseFetchEnv(BaseBulletEnv, ABC):
             print("joints_at_limit_cost")
             print(joints_at_limit_cost)
 
+        # Get the env custom reward
+        custom_reward = self.get_custom_reward()
+        if abs(custom_reward) > 1:
+            print('WARNING REWARD IS NOT NORMALIZED')
+
         self.rewards = [
             alive,
             -1 * self.elapsed_time,
             -1 * sum([abs(_) > 1 for _ in a]),
-            joints_at_limit_cost
+            joints_at_limit_cost,
+            custom_reward,
         ]
         if debugmode:
             print("rewards=")
@@ -175,6 +181,9 @@ class BaseFetchEnv(BaseBulletEnv, ABC):
         self.HUD(state, a, done)
 
         return state, sum(self.rewards), bool(done), {}
+
+    def get_custom_reward(self):
+        return 0
 
 
 class FetchPickKnifeAndCutTestEnv(BaseFetchEnv, ABC):
