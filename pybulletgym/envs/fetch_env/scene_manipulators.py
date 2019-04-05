@@ -48,6 +48,27 @@ class SceneFetch(Scene):
                 if not scene_object.reloadable:
                     self.scene_objects.remove(scene_object)
 
+    def calc_state(self):
+        """
+        We want to update the states of the objects of interest during manipulation.
+        The main interest is the position of each of the objects of interest so we can
+        easily build a reward system around them.
+
+        We also want to be able to add advanced object behaviors such as breaking into smaller
+        pieces.
+
+        the scene state is defined almost as an image where the dims are:
+
+        Max Num Objects x Features
+
+        :return: The scene state.
+        """
+        object_states = []
+
+        """ Handle the knife blade collision """
+        for scene_object in list(reversed([_ for _ in self.scene_objects if not _.removed])):
+            object_states.append(scene_object.calc_state(self))
+        return object_states
 
 class PickAndPlaceScene(SceneFetch):
     """
@@ -55,13 +76,6 @@ class PickAndPlaceScene(SceneFetch):
     an object to another location.
 
     """
-
-    def __init__(self, bullet_client, gravity, timestep, frame_skip):
-        super().__init__(bullet_client, gravity, timestep, frame_skip)
-
-        self.multiplayer = False
-        self.sceneLoaded = 0
-        self.objects_of_interest = []  # type: List[str]
 
     def episode_restart(self, bullet_client: pybullet):
         self._p = bullet_client
@@ -94,13 +108,6 @@ class PickKnifeAndCutTestScene(SceneFetch):
     The goal of this scene is to set up a scene for picking up a knife, and cutting a sphere or a square
 
     """
-
-    def __init__(self, bullet_client, gravity, timestep, frame_skip):
-        super().__init__(bullet_client, gravity, timestep, frame_skip)
-
-        self.multiplayer = False
-        self.sceneLoaded = 0
-        self.scene_objects = []  # type: List[SceneObject]
 
     def episode_restart(self, bullet_client: pybullet):
         self._p = bullet_client
@@ -178,43 +185,11 @@ class PickKnifeAndCutTestScene(SceneFetch):
         for scene_object in self.scene_objects:
             scene_object.reload()
 
-    def calc_state(self):
-        """
-        We want to update the states of the objects of interest during manipulation.
-        The main interest is the position of each of the objects of interest so we can
-        easily build a reward system around them.
-
-        We also want to be able to add advanced object behaviors such as breaking into smaller
-        pieces.
-
-        :return:
-        """
-
-        """ Handle the knife blade collision """
-        for scene_object in list(reversed([_ for _ in self.scene_objects if not _.removed])):
-            scene_object.calc_state(self)
-
-        return 0
-
-
 class PickAndMoveScene(SceneFetch):
     """
     The goal of this scene is to set up a scene for picking up a knife, and cutting a sphere or a square
 
     """
-
-    def __init__(self, bullet_client, gravity, timestep, frame_skip):
-        super().__init__(bullet_client, gravity, timestep, frame_skip)
-
-        self.multiplayer = False
-        self.sceneLoaded = 0
-        self.scene_objects = []  # type: List[SceneObject]
-        self.object_features = {'pos_x': 0, 'pos_y': 0,
-                        'pos_z': 0,
-                        'or_x': 0,
-                        'or_y': 0,
-                        'or_z': 0, 'width': 0,
-                        'height': 0, 'length': 0, 'radius': 0, 'obj_type': 0, 'obj_internal_state': 0}
 
     def episode_restart(self, bullet_client: pybullet):
         self._p = bullet_client
@@ -296,55 +271,6 @@ class PickAndMoveScene(SceneFetch):
                     )
 
                 scene_object.reset_position(object_position)
-
-    def calc_state(self):
-        """
-        We want to update the states of the objects of interest during manipulation.
-        The main interest is the position of each of the objects of interest so we can
-        easily build a reward system around them.
-
-        We also want to be able to add advanced object behaviors such as breaking into smaller
-        pieces.
-
-        the scene state is defined almost as an image where the dims are:
-
-        Max Num Objects x Features
-
-        :return: The scene state.
-        """
-        states = []
-        old_states = []
-
-        """ Handle the knife blade collision """
-        for scene_object in list(reversed([_ for _ in self.scene_objects if not _.removed])):
-            self.object_features = {'pos_x': scene_object.get_position()[0], 'pos_y': scene_object.get_position()[1],
-                        'pos_z': scene_object.get_position()[2],
-                        'or_x': self._p.getEulerFromQuaternion(scene_object.get_orientation())[0],
-                        'or_y': self._p.getEulerFromQuaternion(scene_object.get_orientation())[1],
-                        'or_z': self._p.getEulerFromQuaternion(scene_object.get_orientation())[2], 'width': 0,
-                        'height': 0, 'length': 0, 'radius': 0, 'obj_type': 0, 'obj_internal_state': 0}
-
-            # Get the collision information
-            collision_info = self._p.getCollisionShapeData(scene_object.bodyIndex, scene_object.bodyPartIndex)
-            if not collision_info:
-                collision_info = [[0, 0, 0, (0, 0, 0)]]
-            self.object_features['width'] = collision_info[0][3][0]
-            self.object_features['height'] = collision_info[0][3][1]
-            self.object_features['length'] = collision_info[0][3][2]
-            self.object_features['radius'] = collision_info[0][3][0]
-
-            # Set the types
-            self.object_features['obj_type'] = scene_object.type_id
-            self.object_features['obj_internal_state'] = 0
-
-            if type(scene_object) is TargetSceneObject:
-                scene_object.set_objects_to_compare([o for o in self.scene_objects if type(o) is not TargetSceneObject])
-                old_states.append(scene_object.calc_state(self))
-                self.object_features['obj_internal_state'] = scene_object.calc_state(self)[0]
-            states.append(tuple(self.object_features.values()))
-
-        return tuple(states), tuple(old_states)
-
 
 class KnifeCutScene(SceneFetch):
     """
@@ -442,55 +368,3 @@ class KnifeCutScene(SceneFetch):
                     )
 
                 scene_object.reset_position(object_position)
-
-    def calc_state(self):
-        """
-        We want to update the states of the objects of interest during manipulation.
-        The main interest is the position of each of the objects of interest so we can
-        easily build a reward system around them.
-
-        We also want to be able to add advanced object behaviors such as breaking into smaller
-        pieces.
-
-        the scene state is defined almost as an image where the dims are:
-
-        Max Num Objects x Features
-
-        :return: The scene state.
-        """
-        states = []
-        old_states = []
-
-        """ Handle the knife blade collision """
-        """ Handle the knife blade collision """
-        for scene_object in list(reversed([_ for _ in self.scene_objects if not _.removed])):
-            scene_object.calc_state(self)
-
-        for scene_object in list(reversed([_ for _ in self.scene_objects if not _.removed])):
-            self.object_features = {'pos_x': scene_object.get_position()[0], 'pos_y': scene_object.get_position()[1],
-                        'pos_z': scene_object.get_position()[2],
-                        'or_x': self._p.getEulerFromQuaternion(scene_object.get_orientation())[0],
-                        'or_y': self._p.getEulerFromQuaternion(scene_object.get_orientation())[1],
-                        'or_z': self._p.getEulerFromQuaternion(scene_object.get_orientation())[2], 'width': 0,
-                        'height': 0, 'length': 0, 'radius': 0, 'obj_type': 0, 'obj_internal_state': 0}
-
-            # Get the collision information
-            collision_info = self._p.getCollisionShapeData(scene_object.bodyIndex, scene_object.bodyPartIndex)
-            if not collision_info:
-                collision_info = [[0, 0, 0, (0, 0, 0)]]
-            self.object_features['width'] = collision_info[0][3][0]
-            self.object_features['height'] = collision_info[0][3][1]
-            self.object_features['length'] = collision_info[0][3][2]
-            self.object_features['radius'] = collision_info[0][3][0]
-
-            # Set the types
-            self.object_features['obj_type'] = scene_object.type_id
-            self.object_features['obj_internal_state'] = 0
-
-            if type(scene_object) is TargetSceneObject:
-                scene_object.set_objects_to_compare([o for o in self.scene_objects if type(o) is not TargetSceneObject])
-                old_states.append(scene_object.calc_state(self))
-                self.object_features['obj_internal_state'] = scene_object.calc_state(self)[0]
-            states.append(tuple(self.object_features.values()))
-
-        return tuple(states), tuple(old_states)

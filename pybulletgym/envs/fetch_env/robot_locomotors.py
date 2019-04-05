@@ -84,7 +84,6 @@ class FetchURDF(URDFBasedRobot):
         self._p = bullet_client
         # self.ordered_joints = []
         full_path = os.path.join(os.path.dirname(__file__), "..", "assets", "robots", self.model_urdf)
-        print(full_path)
 
         if self.self_collision and self.robot_body is None:
             self.parts, self.jdict, self.ordered_joints, self.robot_body = self.addToScene(self._p,
@@ -136,8 +135,8 @@ class FetchURDF(URDFBasedRobot):
         self.l_gripper_finger_link = self.parts['l_gripper_finger_link']
 
     def alive_bonus(self, z, pitch):
-        # print(f'z is {z} pitch is: {pitch}')
-        return +2 if 2 > z > -0.2 and .28 > pitch > -.1 else -1  # 2 here because 17 joints produce a lot of electricity cost just from policy noise, living must be better than dying
+        return 2 if abs(z - self.body_xyz[2]) < 0.1 else -1
+        # return +2 if 2 > z > -0.2 and .28 > pitch > -.1 else -1  # 2 here because 17 joints produce a lot of electricity cost just from policy noise, living must be better than dying
 
 
 class FetchMJCF(MJCFBasedRobot):

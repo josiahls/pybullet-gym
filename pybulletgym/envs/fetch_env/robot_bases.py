@@ -120,7 +120,6 @@ class MJCFBasedRobot(XmlBasedRobot):
         full_path = os.path.join(os.path.dirname(__file__), "..", "assets", "mjcf", self.model_xml)
 
         self._p = bullet_client
-        # print("Created bullet_client with id=", self._p._client)
         if self.doneLoading == 0:
             self.ordered_joints = []
             self.doneLoading = 1
@@ -160,7 +159,6 @@ class URDFBasedRobot(XmlBasedRobot):
         self._p = bullet_client
         # self.ordered_joints = []
         full_path = os.path.join(os.path.dirname(__file__), "..", "assets", "robots", self.model_urdf)
-        print(full_path)
 
         if self.self_collision and self.robot_body is None:
             self.parts, self.jdict, self.ordered_joints, self.robot_body = self.addToScene(self._p,

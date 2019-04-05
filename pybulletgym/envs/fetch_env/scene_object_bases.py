@@ -1,17 +1,26 @@
+from collections import namedtuple
 from typing import List
 
+from namedlist import namedlist
 from pybullet_utils.bullet_client import BulletClient
 import numpy as np
+
+# from .scene_manipulators import SceneFetch
 from .robot_bases import BodyPart
+
+Features = namedlist("Features", ['pos_x', 'pos_y', 'pos_z', 'or_x', 'or_y', 'or_z', 'width', 'height',
+                                  'length', 'radius', 'obj_type', 'obj_internal_state'], default=0)
 
 
 class SceneObject(BodyPart):
-    def __init__(self, bullet_client: BulletClient, filename: str = None, position: list = None, orientation: list = None,
+    def __init__(self, bullet_client: BulletClient, filename: str = None, position: list = None,
+                 orientation: list = None,
                  flags=0, removable=False, reloadable=True, type_id=0):
         self.filename = filename
         if self.filename is not None:
             # Load the object mesh
-            self.params = {'fileName': filename, 'basePosition': position, 'baseOrientation': orientation, 'flags': flags}
+            self.params = {'fileName': filename, 'basePosition': position, 'baseOrientation': orientation,
+                           'flags': flags}
             self.params = {_: self.params[_] for _ in self.params if self.params[_] is not None}
             self.bodyIndex = bullet_client.loadURDF(**self.params)
 
@@ -55,8 +64,53 @@ class SceneObject(BodyPart):
             self._p.removeBody(self.bodyIndex)
             self.removed = True
 
-    def calc_state(self, scene):
-        return 0
+    def calc_state(self, scene) -> namedtuple:
+        """
+        Updates the external and internal state of the scene object.
+
+        :param scene:
+        :return:
+        """
+        features = Features()
+
+        if self.removed:
+            return tuple(features)
+
+        features.pos_x = self.get_position()[0]
+        features.pos_y = self.get_position()[1]
+        features.pos_z = self.get_position()[2]
+
+        features.or_x = self._p.getEulerFromQuaternion(self.get_orientation())[0]
+        features.or_y = self._p.getEulerFromQuaternion(self.get_orientation())[1]
+        features.or_z = self._p.getEulerFromQuaternion(self.get_orientation())[2]
+
+        # Get the collision information (description of the basic mesh)
+        collision_info = self._p.getCollisionShapeData(self.bodyIndex, self.bodyPartIndex)
+        if not collision_info:
+            collision_info = [[0, 0, 0, (0, 0, 0)]]
+
+        features.width = collision_info[0][3][0]
+        features.height = collision_info[0][3][1]
+        features.length = collision_info[0][3][2]
+        features.radius = collision_info[0][3][0]
+
+        # Set the types
+        features.obj_type = self.type_id
+
+        # Set the internal state
+        features.obj_internal_state = self._get_internal_state(scene)
+
+        # Before returning, we use the namedtuple to verify that all the field required are filled
+        return tuple(features)
+
+    def _get_internal_state(self, scene) -> float:
+        """
+        Each object might have some internal state it might want to modify such as distance, stress, decay, etc.
+
+        :param scene:
+        :return:
+        """
+        return 1.0
 
     def _closest_index_array_within_limit(self, array, value, limit):
         """
@@ -87,9 +141,10 @@ class SceneObject(BodyPart):
 
 
 class TargetSceneObject(SceneObject):
-    def __init__(self, bullet_client: BulletClient, filename: str = None, position: list = None, orientation: list = None,
-                 flags=0, removable=False, reloadable=True, create_body_params = None, create_collision_params = None,
-                 create_visual_shape_params = None):
+    def __init__(self, bullet_client: BulletClient, filename: str = None, position: list = None,
+                 orientation: list = None,
+                 flags=0, removable=False, reloadable=True, create_body_params=None, create_collision_params=None,
+                 create_visual_shape_params=None):
         """
         A slicable object for now is a single mesh, zero link object that can break into smaller objects
         via being removed from the world, and being replaced by smaller children.
@@ -110,8 +165,9 @@ class TargetSceneObject(SceneObject):
             create_visual_shape_params = {_: create_visual_shape_params[_] for _ in create_visual_shape_params if
                                           create_visual_shape_params[_] is not None}
             create_collision_params = {_: create_collision_params[_] for _ in create_collision_params if
-                                          create_collision_params[_] is not None}
-            create_body_params = {_: create_body_params[_] for _ in create_body_params if create_body_params[_] is not None}
+                                       create_collision_params[_] is not None}
+            create_body_params = {_: create_body_params[_] for _ in create_body_params if
+                                  create_body_params[_] is not None}
 
             self.create_visual_shape_params = create_visual_shape_params
             self.create_collision_params = create_collision_params
@@ -130,13 +186,22 @@ class TargetSceneObject(SceneObject):
     def set_objects_to_compare(self, objects_to_compare):
         self.objects_to_compare = objects_to_compare
 
-    def calc_state(self, scene):
-        return tuple([np.linalg.norm(self.get_position() - other_object.get_position())
-                      for other_object in self.objects_to_compare])
+    def _get_internal_state(self, scene):
+        """
+        Returns the sum distances of the target against non-target objects
+
+        :param scene:
+        :return:
+        """
+        objects_to_compare = [o for o in scene.scene_objects if type(o) is not TargetSceneObject]
+
+        return sum([np.linalg.norm(self.get_position() - other_object.get_position())
+                    for other_object in objects_to_compare])
 
 
 class SlicingSceneObject(SceneObject):
-    def __init__(self, bullet_client: BulletClient, filename: str = None, position: list = None, orientation: list = None,
+    def __init__(self, bullet_client: BulletClient, filename: str = None, position: list = None,
+                 orientation: list = None,
                  flags=0, removable=False, reloadable=True, slicing_parts: List[str] = None):
         super().__init__(bullet_client, filename, position, orientation, flags, removable, reloadable, 2)
 
@@ -146,14 +211,12 @@ class SlicingSceneObject(SceneObject):
         else:
             self.slice_parts = [_ for _ in [self] + self.children if _.body_name in slicing_parts]
 
-    def calc_state(self, scene):
-        pass
-
 
 class SlicableSceneObject(SceneObject):
-    def __init__(self, bullet_client: BulletClient, filename: str = None, position: list = None, orientation: list = None,
-                 flags=0, removable=False, reloadable=True, create_body_params = None, create_collision_params = None,
-                 create_visual_shape_params = None):
+    def __init__(self, bullet_client: BulletClient, filename: str = None, position: list = None,
+                 orientation: list = None,
+                 flags=0, removable=False, reloadable=True, create_body_params=None, create_collision_params=None,
+                 create_visual_shape_params=None):
         """
         A slicable object for now is a single mesh, zero link object that can break into smaller objects
         via being removed from the world, and being replaced by smaller children.
@@ -174,8 +237,9 @@ class SlicableSceneObject(SceneObject):
             create_visual_shape_params = {_: create_visual_shape_params[_] for _ in create_visual_shape_params if
                                           create_visual_shape_params[_] is not None}
             create_collision_params = {_: create_collision_params[_] for _ in create_collision_params if
-                                          create_collision_params[_] is not None}
-            create_body_params = {_: create_body_params[_] for _ in create_body_params if create_body_params[_] is not None}
+                                       create_collision_params[_] is not None}
+            create_body_params = {_: create_body_params[_] for _ in create_body_params if
+                                  create_body_params[_] is not None}
 
             self.create_visual_shape_params = create_visual_shape_params
             self.create_collision_params = create_collision_params
@@ -214,12 +278,9 @@ class SlicableSceneObject(SceneObject):
         :param scene:
         :return:
         """
-        if self.removed:
-            return 0
-
-        if self.slicing_cool_down != 0:
+        if not self.removed and self.slicing_cool_down != 0:
             self.slicing_cool_down -= 1
-        else:
+        elif not self.removed:
             # If the object has cooled down, start checking for slicing events
             for slicing_object in [_ for _ in scene.scene_objects if type(_) is SlicingSceneObject
                                    if not _.removed]:
@@ -237,9 +298,11 @@ class SlicableSceneObject(SceneObject):
                         contacts_to_slicing = self._p.getContactPoints(slicing_joint_id[0], slicable_object_id[0],
                                                                        slicing_joint_id[1], slicable_object_id[1])
 
-                        # contacts_to_sliceable[0][11] < -0.8 is the specific downward force that the knife (body B) is applying to
-                        # a slicable object A. This prevents "side" slicing. Only the sharp part of the blade is valid
-                        if len(contacts_to_sliceable) == 1 and contacts_to_slicing[0][9] > 0.4 and abs(contacts_to_slicing[0][11][1]) > 0.8:
+                        # contacts_to_sliceable[0][11] < -0.8 is the specific downward force that the knife (body B)
+                        # is applying to a slicable object A. This prevents "side" slicing. Only the sharp part
+                        # of the blade is valid
+                        if len(contacts_to_sliceable) == 1 and contacts_to_slicing[0][9] > 0.4 and abs(
+                                contacts_to_slicing[0][11][1]) > 0.8:
                             # print(f'Full Collision is happening at {self.body_name}')
                             """ Do Decomposition """
                             # Get information on slicable object
@@ -254,35 +317,45 @@ class SlicableSceneObject(SceneObject):
                             axis = 0
                             """ Singular axis rotations (others are 0) """
                             # Y rotated 90 degrees, keep Y whether it is 90 or 0
-                            axis = 0 if self._is_value_within_limit(slicing_rel_orientation, 0, 1.5, 0.2) != -1 else axis
+                            axis = 0 if self._is_value_within_limit(slicing_rel_orientation, 0, 1.5,
+                                                                    0.2) != -1 else axis
                             # X rotated 90 degrees, make Z
-                            axis = 2 if self._is_value_within_limit(slicing_rel_orientation, 1, 1.5, 0.2) != -1 else axis
+                            axis = 2 if self._is_value_within_limit(slicing_rel_orientation, 1, 1.5,
+                                                                    0.2) != -1 else axis
                             # Z rotated 90 degrees, make X
-                            axis = 1 if self._is_value_within_limit(slicing_rel_orientation, 2, 1.5, 0.2) != -1 else axis
+                            axis = 1 if self._is_value_within_limit(slicing_rel_orientation, 2, 1.5,
+                                                                    0.2) != -1 else axis
                             """ Combined axis rotations """
                             # For Y
                             axis = 2 if self._is_value_within_limit(slicing_rel_orientation, 0, 1.5, 0.2) != -1 and \
-                                        self._is_value_within_limit(slicing_rel_orientation, 1, 1.5, 0.2) != -1 else axis
+                                        self._is_value_within_limit(slicing_rel_orientation, 1, 1.5,
+                                                                    0.2) != -1 else axis
                             axis = 1 if self._is_value_within_limit(slicing_rel_orientation, 0, 1.5, 0.2) != -1 and \
-                                        self._is_value_within_limit(slicing_rel_orientation, 2, 1.5, 0.2) != -1 else axis
+                                        self._is_value_within_limit(slicing_rel_orientation, 2, 1.5,
+                                                                    0.2) != -1 else axis
                             # For X
                             axis = 1 if self._is_value_within_limit(slicing_rel_orientation, 1, 1.5, 0.2) != -1 and \
-                                        self._is_value_within_limit(slicing_rel_orientation, 2, 1.5, 0.2) != -1 else axis
+                                        self._is_value_within_limit(slicing_rel_orientation, 2, 1.5,
+                                                                    0.2) != -1 else axis
                             axis = 2 if self._is_value_within_limit(slicing_rel_orientation, 1, 1.5, 0.2) != -1 and \
-                                        self._is_value_within_limit(slicing_rel_orientation, 0, 1.5, 0.2) != -1 else axis
+                                        self._is_value_within_limit(slicing_rel_orientation, 0, 1.5,
+                                                                    0.2) != -1 else axis
                             axis = 2 if self._is_value_within_limit(slicing_rel_orientation, 0, 1.5, 0.2) != -1 and \
                                         self._is_value_within_limit(slicing_rel_orientation, 1, 1.5, 0.2) != -1 and \
-                                        self._is_value_within_limit(slicing_rel_orientation, 2, 1.5, 0.2) != -1 else axis
+                                        self._is_value_within_limit(slicing_rel_orientation, 2, 1.5,
+                                                                    0.2) != -1 else axis
 
-                            # Finally, if the knive's contact point's normal is parallel to the exis, then
+                            # Finally, if the knive's contact point's normal is parallel to the axis, then
                             if axis == np.argmax(np.abs(contacts_to_slicing[0][7])):
                                 # print('The knife is not allowed to cut perpendicular to its blade direction')
                                 break
 
-                            self.split(axis, slicable_base_mesh, slicable_position, slicable_orientation, scene,
-                                       contacts_to_sliceable)
+                            self._split(axis, slicable_base_mesh, slicable_position, slicable_orientation, scene,
+                                        contacts_to_sliceable)
 
-    def split(self, axis, original_mesh, original_position, original_orientation, scene, contacts):
+        return super(SlicableSceneObject, self).calc_state(scene)
+
+    def _split(self, axis, original_mesh, original_position, original_orientation, scene, contacts):
         print(str(scene.scene_objects))
 
         original_mesh = list(map(lambda x: x * 0.5, original_mesh))
@@ -306,11 +379,11 @@ class SlicableSceneObject(SceneObject):
 
         slice2_position = np.copy(original_position)
         slice2_position[axis] = contacts[0][5][axis]
-        slice2_position[axis] += (1.1*slice_mesh2[axis])
+        slice2_position[axis] += (1.1 * slice_mesh2[axis])
         # Notes: the baseCollisionShapeIndex and baseVisualShapeIndex will automatically be added
         self.remove()
         scene.scene_objects.append(SlicableSceneObject(self._p,
-                                                       create_body_params={'baseMass':1,
+                                                       create_body_params={'baseMass': 1,
                                                                            'basePosition': slice1_position,
                                                                            'baseOrientation': original_orientation},
                                                        create_collision_params={'shapeType': self._p.GEOM_BOX,
@@ -322,7 +395,7 @@ class SlicableSceneObject(SceneObject):
                                                        removable=True, reloadable=False))
 
         scene.scene_objects.append(SlicableSceneObject(self._p,
-                                                       create_body_params={'baseMass':1,
+                                                       create_body_params={'baseMass': 1,
                                                                            'basePosition': slice2_position,
                                                                            'baseOrientation': original_orientation},
                                                        create_collision_params={'shapeType': self._p.GEOM_BOX,
