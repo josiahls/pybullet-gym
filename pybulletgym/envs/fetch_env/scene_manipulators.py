@@ -2,20 +2,54 @@ import inspect
 import operator
 import os
 import pybullet
-from collections import namedtuple, OrderedDict
 from typing import List
 
 import numpy as np
 
-from .scene_object_bases import SceneObject, SlicingSceneObject, SlicableSceneObject, TargetSceneObject
 from .scene_bases import Scene
+from .scene_object_bases import SceneObject, SlicingSceneObject, SlicableSceneObject, TargetSceneObject
 
 currentdir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
 parentdir = os.path.dirname(currentdir)
 os.sys.path.insert(0, parentdir)
 
 
-class PickAndPlaceScene(Scene):
+class SceneFetch(Scene):
+    def __init__(self, bullet_client, gravity, timestep, frame_skip):
+        super().__init__(bullet_client, gravity, timestep, frame_skip)
+
+        self.multiplayer = False
+        self.sceneLoaded = 0
+        self.scene_objects = []  # type: List[SceneObject]
+
+    def _dynamic_object_clear(self):
+        """
+        Some objects might be split into smaller objects or duplicated.
+        The original state will most likely not have this, so calling this method is
+        important for state restoration.
+
+        As a note, the remove order does not matter, the reload does matter.
+        Also, you cannot currently have non-removable objects loaded after removable objects.
+
+        :return:
+        """
+        # We will be iterating through the list of objects backwards via the order that they were added
+        for scene_object in reversed(sorted(self.scene_objects, key=lambda x: x.bodyIndex)):
+            # We are going to remove all of them since bullet3 does not allow detailed object reloading.
+            # Basically, if we have removable objects 3, 4, 5, 6 and we remove 4 then bullet3 will have
+            # 3, None, 5, 6. Then when we re-add the missing object (I think) it ends up doing
+            # 3, 5, 6, 4... I think it shifts the objects down... so it is better to just remove all of them.
+            if scene_object.removable:
+                # So I think it doesnt like orphans
+                self._p.removeBody(scene_object.bodyIndex)
+                scene_object.removed = True
+                # Some objects might be created during run-time. They need to be removed to
+                # successfully restore the state
+                if not scene_object.reloadable:
+                    self.scene_objects.remove(scene_object)
+
+
+class PickAndPlaceScene(SceneFetch):
     """
     The goal of this scene is to set up a scene for picking up and moving
     an object to another location.
@@ -55,7 +89,7 @@ class PickAndPlaceScene(Scene):
             self._p.loadURDF(filename, [1, 0.3, 0.65])
 
 
-class PickKnifeAndCutTestScene(Scene):
+class PickKnifeAndCutTestScene(SceneFetch):
     """
     The goal of this scene is to set up a scene for picking up a knife, and cutting a sphere or a square
 
@@ -162,27 +196,8 @@ class PickKnifeAndCutTestScene(Scene):
 
         return 0
 
-    def _dynamic_object_clear(self):
-        """
-        Some objects might be split into smaller objects or duplicated.
-        The original state will most likely not have this, so calling this method is
-        important for state restoration.
 
-        As a note, the remove order does not matter, the reload does matter.
-        Also, you cannot currently have non-removable objects loaded after removable objects.
-
-        :return:
-        """
-        for scene_object in reversed(sorted(self.scene_objects, key=lambda x: x.bodyIndex)):
-            if scene_object.removable and not scene_object.removed:
-                # So I think it doesnt like orphans
-                self._p.removeBody(scene_object.bodyIndex)
-                scene_object.removed = True
-                if not scene_object.reloadable:
-                    self.scene_objects.remove(scene_object)
-
-
-class PickAndMoveScene(Scene):
+class PickAndMoveScene(SceneFetch):
     """
     The goal of this scene is to set up a scene for picking up a knife, and cutting a sphere or a square
 
@@ -330,27 +345,8 @@ class PickAndMoveScene(Scene):
 
         return tuple(states), tuple(old_states)
 
-    def _dynamic_object_clear(self):
-        """
-        Some objects might be split into smaller objects or duplicated.
-        The original state will most likely not have this, so calling this method is
-        important for state restoration.
 
-        As a note, the remove order does not matter, the reload does matter.
-        Also, you cannot currently have non-removable objects loaded after removable objects.
-
-        :return:
-        """
-        for scene_object in reversed(sorted(self.scene_objects, key=lambda x: x.bodyIndex)):
-            if scene_object.removable and not scene_object.removed:
-                # So I think it doesnt like orphans
-                self._p.removeBody(scene_object.bodyIndex)
-                scene_object.removed = True
-                if not scene_object.reloadable:
-                    self.scene_objects.remove(scene_object)
-
-
-class KnifeCutScene(Scene):
+class KnifeCutScene(SceneFetch):
     """
     The goal of this scene is to set up a scene for picking up a knife, and cutting a sphere or a square
 
@@ -498,22 +494,3 @@ class KnifeCutScene(Scene):
             states.append(tuple(self.object_features.values()))
 
         return tuple(states), tuple(old_states)
-
-    def _dynamic_object_clear(self):
-        """
-        Some objects might be split into smaller objects or duplicated.
-        The original state will most likely not have this, so calling this method is
-        important for state restoration.
-
-        As a note, the remove order does not matter, the reload does matter.
-        Also, you cannot currently have non-removable objects loaded after removable objects.
-
-        :return:
-        """
-        for scene_object in reversed(sorted(self.scene_objects, key=lambda x: x.bodyIndex)):
-            if scene_object.removable and not scene_object.removed:
-                # So I think it doesnt like orphans
-                self._p.removeBody(scene_object.bodyIndex)
-                scene_object.removed = True
-                if not scene_object.reloadable:
-                    self.scene_objects.remove(scene_object)

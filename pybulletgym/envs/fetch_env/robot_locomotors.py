@@ -28,7 +28,7 @@ class FetchURDF(URDFBasedRobot):
 
         self.pos_after = 0
 
-        """ Update the manipulator fields. We have these are fields so they are easier to interface with """
+        # Update the manipulator fields. We have these are fields so they are easier to interface with
         self.r_gripper_finger_link = None  # type: Joint
         self.l_gripper_finger_link = None  # type: Joint
 

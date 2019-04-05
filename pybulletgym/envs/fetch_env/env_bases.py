@@ -1,9 +1,12 @@
-import gym, gym.spaces, gym.utils, gym.utils.seeding
-import numpy as np
 import pybullet
-from pybullet_envs.bullet import bullet_client
 
+import gym
+import gym.spaces
+import gym.utils
+import gym.utils.seeding
+import numpy as np
 from pkg_resources import parse_version
+from pybullet_envs.bullet import bullet_client
 
 
 class BaseBulletEnv(gym.Env):
@@ -122,6 +125,7 @@ class BaseBulletEnv(gym.Env):
         render = _render
         reset = _reset
         seed = _seed
+
 
 class Camera:
     def __init__(self):

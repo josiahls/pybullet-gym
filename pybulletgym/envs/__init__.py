@@ -150,6 +150,7 @@ register(
 	max_episode_steps=1000
 )
 
+""" Fetch Envs """
 register(
 	id='FetchPickKnifeAndCutTestEnv-v0',
 	entry_point='pybulletgym.envs.fetch_env.gym_locomotion_envs:FetchPickKnifeAndCutTestEnv',
@@ -159,7 +160,7 @@ register(
 register(
 	id='FetchMoveBlockEnv-v0',
 	entry_point='pybulletgym.envs.fetch_env.gym_locomotion_envs:FetchMoveBlockEnv',
-	max_episode_steps=100000
+	max_episode_steps=1000
 )
 
 register(

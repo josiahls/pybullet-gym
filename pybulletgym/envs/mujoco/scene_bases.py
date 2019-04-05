@@ -1,6 +1,7 @@
-import sys, os
+import os
+import sys
+
 sys.path.append(os.path.dirname(__file__))
-import pybullet as p
 
 import gym
 
@@ -50,6 +51,7 @@ class Scene:
         observations from robots using step() with the same action.
         """
         self.cpp_world.step(self.frame_skip)
+
 
 class SingleRobotEmptyScene(Scene):
     multiplayer = False  # this class is used "as is" for InvertedPendulum, Reacher
