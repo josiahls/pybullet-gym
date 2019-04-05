@@ -48,6 +48,9 @@ class SceneFetch(Scene):
                 if not scene_object.reloadable:
                     self.scene_objects.remove(scene_object)
 
+    def dynamic_object_load(self, bullet_client: pybullet):
+        pass
+
     def calc_state(self):
         """
         We want to update the states of the objects of interest during manipulation.
