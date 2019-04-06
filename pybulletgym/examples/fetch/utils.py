@@ -26,7 +26,7 @@ class Plotter(object):
         if not self.line1:
             # this is the call to matplotlib that allows dynamic plotting
             plt.ion()
-            fig = plt.figure(figsize=(13, 6))
+            fig = plt.figure(figsize=(8, 6))
             ax = fig.add_subplot(111)
             # create a variable for the line so we can later update it
             self.line1, = ax.plot(self.x_vec, self.y_vec, '-o', alpha=0.8)

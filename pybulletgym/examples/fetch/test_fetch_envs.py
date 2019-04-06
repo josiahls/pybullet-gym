@@ -5,10 +5,13 @@ import pybulletgym.envs
 import numpy as np
 import pybullet as p
 
+from utils import Plotter
+
 env_list = [
-    'FetchPickKnifeAndCutTestEnv-v0',
-    'FetchMoveBlockEnv-v0',
-    'FetchCutBlockEnv-v1'
+    # 'FetchPickKnifeAndCutTestEnv-v0',
+    # 'FetchMoveBlockEnv-v0',
+    # 'FetchCutBlockEnv-v1',
+    'FetchInternalTrainEnv-v0',
 ]
 
 for env_name in env_list:
@@ -24,6 +27,8 @@ for env_name in env_list:
     # env.render(mode="rgb_array")
     env.render(mode="human")
     env.reset()
+
+    plotter = Plotter()
 
     # Find the robot's base
     baseId = -1
@@ -43,5 +48,8 @@ for env_name in env_list:
             env.env._p.resetDebugVisualizerCamera(distance, yaw, -45, fetchPos)
 
             results = env.step(np.zeros(env.action_space.high.shape))
+
+            plotter.live_plotter(results[1], 'Reward')
+
         print('Resetting')
         env.reset()

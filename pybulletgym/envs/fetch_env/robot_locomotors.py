@@ -2,7 +2,7 @@ import numpy as np
 from pybullet_envs.bullet.bullet_client import BulletClient
 from pybullet_envs.scene_abstract import Scene
 import os
-from fetch_env.robot_bases import URDFBasedRobot
+from .robot_bases import URDFBasedRobot
 from .robot_bases import Joint
 import pybullet
 from pybullet_envs.bullet import bullet_client
@@ -47,6 +47,7 @@ class FetchURDF(URDFBasedRobot):
         # even elements [0::2] position, scaled to -1..+1 between limits
         # odd elements  [1::2] angular speed, scaled to show -1..+1
         self.joint_speeds = j[1::2]
+        self.joints_at_speed_limit = np.count_nonzero([j1.jointMaxVelocity < np.abs(self.joint_speeds[i]) for i, j1 in enumerate(self.ordered_joints)])
         self.joints_at_limit = np.count_nonzero(np.abs(j[0::2]) > 0.99)
 
         """ Set the robot's general body position. Primarily concerned with torso (base position). """
@@ -66,9 +67,10 @@ class FetchURDF(URDFBasedRobot):
             self.initial_z = z
 
         return np.concatenate([
-            qpos.flat[1:],  # self.sim.data.qpos.flat[1:],
+            j,
+            # qpos.flat[1:],  # self.sim.data.qpos.flat[1:],
             # np.clip(qvel, -1, 1).flat  # self.sim.data.qvel.flat,
-            np.array(qvel).flat
+            np.array(qvel)
         ])
 
     def apply_action(self, a):
@@ -135,7 +137,7 @@ class FetchURDF(URDFBasedRobot):
         self.l_gripper_finger_link = self.parts['l_gripper_finger_link']
 
     def alive_bonus(self, z, pitch):
-        return 2 if abs(z - self.body_xyz[2]) < 0.1 else -1
+        return 2 if abs(z - self.body_xyz[2]) < 0.1 else -4
         # return +2 if 2 > z > -0.2 and .28 > pitch > -.1 else -1  # 2 here because 17 joints produce a lot of electricity cost just from policy noise, living must be better than dying
 
 

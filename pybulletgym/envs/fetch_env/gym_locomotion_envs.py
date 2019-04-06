@@ -1,4 +1,5 @@
 import pybullet
+import random
 from abc import ABC
 
 import numpy as np
@@ -27,7 +28,7 @@ class BaseFetchEnv(BaseBulletEnv, ABC):
         self.robot = FetchURDF()
         BaseBulletEnv.__init__(self, self.robot)
 
-        self.joints_at_limit_cost = -0.1
+        self.joints_at_limit_cost = -1.
         self.scene = None
         self.potential = 0
         self.rewards = []
@@ -36,7 +37,7 @@ class BaseFetchEnv(BaseBulletEnv, ABC):
         self.done = 0
         self.reward = 0
         self.elapsed_time = 0
-        self.max_state_space_object_size = 10
+        self.max_state_space_object_size = 3
         self._p = None
 
     def reset(self):
@@ -77,6 +78,7 @@ class BaseFetchEnv(BaseBulletEnv, ABC):
         self.frame = 0
         self.done = 0
         self.reward = 0
+        self.elapsed_time = 0
         s = self.robot.reset(self._p, scene=self.scene)
         self.robot.robot_specific_reset(self._p)
         self.camera._p = self._p
@@ -147,9 +149,10 @@ class BaseFetchEnv(BaseBulletEnv, ABC):
                   f'rpy is {self.robot.body_rpy} rxy is {self.robot.body_xyz}')
 
         # Punish higher amounts of time
-        self.elapsed_time += 0.01
+        # self.elapsed_time += 0.01
 
         joints_at_limit_cost = float(self.joints_at_limit_cost * self.robot.joints_at_limit)
+        joints_at_speed_limit_cost = float(self.joints_at_limit_cost * self.robot.joints_at_speed_limit)
         debugmode = 0
         if debugmode:
             print("alive=")
@@ -169,8 +172,8 @@ class BaseFetchEnv(BaseBulletEnv, ABC):
         self.rewards = [
             alive,
             -1 * self.elapsed_time,
-            -1 * sum([abs(_) > 1 for _ in a]),
             joints_at_limit_cost,
+            joints_at_speed_limit_cost,
             custom_reward,
         ]
         if debugmode:
@@ -205,3 +208,22 @@ class FetchCutBlockEnv_v1(BaseFetchEnv, ABC):
     def create_single_player_scene(self, _p: BulletClient):
         self.scene = KnifeCutScene(_p, gravity=9.8, timestep=0.0165 / 4, frame_skip=4)
         return self.scene
+
+
+class FetchInternalTrainEnv(BaseFetchEnv, ABC):
+    """
+    The reward functions for this env will involve lifting the arm overhead
+
+    """
+    def __init__(self):
+        super().__init__()
+
+        self.randomCeiling = .2#random.uniform(.5, 2)
+
+    def create_single_player_scene(self, _p: BulletClient):
+        self.scene = PickAndMoveScene(_p, gravity=9.8, timestep=0.0165 / 4, frame_skip=4)
+        return self.scene
+
+    def get_custom_reward(self):
+        return (self.robot.l_gripper_finger_link.get_position()[2] - self.randomCeiling) / self.randomCeiling or \
+               (self.robot.r_gripper_finger_link.get_position()[2] - self.randomCeiling) / self.randomCeiling
