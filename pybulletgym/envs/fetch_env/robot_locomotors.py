@@ -12,7 +12,7 @@ from pybulletgym.envs.mujoco.robot_bases import XmlBasedRobot, MJCFBasedRobot
 
 class FetchURDF(URDFBasedRobot):
 
-    def __init__(self, power=0.0001):
+    def __init__(self, power=2.9):
         URDFBasedRobot.__init__(self, "fetch/fetch_description/robots/fetch.urdf", "base_link", action_dim=25,
                                 obs_dim=70, self_collision=True)
         self.power = power
@@ -25,6 +25,7 @@ class FetchURDF(URDFBasedRobot):
         self.initial_z = None
         self.joint_speeds = []
         self.joints_at_limit = []
+        self.lock_joints = [0] * self.action_space.shape[0]
 
         self.pos_after = 0
 
@@ -43,12 +44,15 @@ class FetchURDF(URDFBasedRobot):
         qpos = np.array([j.get_position() for j in self.ordered_joints], dtype=np.float32).flatten()  # shape (25,)
         qvel = np.array([j.get_velocity() for j in self.ordered_joints], dtype=np.float32).flatten()  # shape (25,)
 
+        print(qvel.max())
+
+        temp_var = [str(j.current_relative_position()) + ' ' + j.joint_name for j in self.ordered_joints]
         j = np.array([j.current_relative_position() for j in self.ordered_joints], dtype=np.float32).flatten()
         # even elements [0::2] position, scaled to -1..+1 between limits
         # odd elements  [1::2] angular speed, scaled to show -1..+1
         self.joint_speeds = j[1::2]
         self.joints_at_speed_limit = np.count_nonzero([j1.jointMaxVelocity < np.abs(self.joint_speeds[i]) for i, j1 in enumerate(self.ordered_joints)])
-        self.joints_at_limit = np.count_nonzero(np.abs(j[0::2]) > 0.99)
+        self.joints_at_limit = np.count_nonzero(np.abs(j[0::2]) > 1)
 
         """ Set the robot's general body position. Primarily concerned with torso (base position). """
         body_pose = self.robot_body.pose()
@@ -93,7 +97,7 @@ class FetchURDF(URDFBasedRobot):
                                                                                                             basePosition=self.basePosition,
                                                                                                             baseOrientation=self.baseOrientation,
                                                                                                             useFixedBase=self.fixed_base,
-                                                                                                            flags=pybullet.URDF_USE_SELF_COLLISION | pybullet.URDF_USE_MATERIAL_COLORS_FROM_MTL | pybullet.URDF_USE_MATERIAL_TRANSPARANCY_FROM_MTL))
+                                                                                                            flags=pybullet.URDF_USE_SELF_COLLISION  | pybullet.URDF_USE_MATERIAL_COLORS_FROM_MTL | pybullet.URDF_USE_MATERIAL_TRANSPARANCY_FROM_MTL))
         elif self.robot_body is None:
             self.parts, self.jdict, self.ordered_joints, self.robot_body = self.addToScene(self._p,
                                                                                            self._p.loadURDF(full_path,
@@ -133,8 +137,10 @@ class FetchURDF(URDFBasedRobot):
         self.reset_pose([0, 0, 0.01], [0, 0, 0, 1])
         self.initial_z = None
 
-        self.r_gripper_finger_link = self.parts['r_gripper_finger_link']
-        self.l_gripper_finger_link = self.parts['l_gripper_finger_link']
+        if 'r_gripper_finger_link' in self.parts:
+            self.r_gripper_finger_link = self.parts['r_gripper_finger_link']
+        if 'l_gripper_finger_link' in self.parts:
+            self.r_gripper_finger_link = self.parts['l_gripper_finger_link']
 
     def alive_bonus(self, z, pitch):
         return 2 if abs(z - self.body_xyz[2]) < 0.1 else -4

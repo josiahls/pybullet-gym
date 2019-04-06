@@ -225,5 +225,6 @@ class FetchInternalTrainEnv(BaseFetchEnv, ABC):
         return self.scene
 
     def get_custom_reward(self):
-        return (self.robot.l_gripper_finger_link.get_position()[2] - self.randomCeiling) / self.randomCeiling or \
-               (self.robot.r_gripper_finger_link.get_position()[2] - self.randomCeiling) / self.randomCeiling
+        return 0
+        # return (self.robot.l_gripper_finger_link.get_position()[2] - self.randomCeiling) / self.randomCeiling or \
+        #        (self.robot.r_gripper_finger_link.get_position()[2] - self.randomCeiling) / self.randomCeiling

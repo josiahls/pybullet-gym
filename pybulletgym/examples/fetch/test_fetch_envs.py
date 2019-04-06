@@ -28,7 +28,7 @@ for env_name in env_list:
     env.render(mode="human")
     env.reset()
 
-    plotter = Plotter()
+    # plotter = Plotter()
 
     # Find the robot's base
     baseId = -1
@@ -39,17 +39,18 @@ for env_name in env_list:
             print("found base")
 
     for i in range(20):
-        for _ in range(50):
+        for _ in range(25):
             # print(env.render(mode="human"))
             # results = env.step(env.action_space.sample())
-            fetchPos, fetchOrn = env.env._p.getBasePositionAndOrientation(baseId)
-            distance = 1.5
-            yaw = 90
-            env.env._p.resetDebugVisualizerCamera(distance, yaw, -45, fetchPos)
+            # fetchPos, fetchOrn = env.env._p.getBasePositionAndOrientation(baseId)
+            # distance = 1.5
+            # yaw = 90
+            # env.env._p.resetDebugVisualizerCamera(distance, yaw, -45, fetchPos)
 
             results = env.step(np.zeros(env.action_space.high.shape))
 
-            plotter.live_plotter(results[1], 'Reward')
+            # plotter.live_plotter(results[1], 'Reward')
+            sleep(.1)
 
         print('Resetting')
         env.reset()
