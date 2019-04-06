@@ -467,6 +467,7 @@
         <!--<limit effort="60" lower="0.0" upper="0.05" velocity="0.05"/>-->
         <!--&lt;!&ndash; <dynamics damping="1.0"/> &ndash;&gt;-->
     <!--</joint>-->
+    <!-- Comment for Location of edits -->
     <link name="bellows_link">
         <inertial>
             <origin rpy="0 0 0" xyz="0.0191320000286228 -1.67219873481315E-16 -0.134861625443387"/>
