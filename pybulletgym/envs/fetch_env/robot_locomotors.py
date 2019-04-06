@@ -137,10 +137,8 @@ class FetchURDF(URDFBasedRobot):
         self.reset_pose([0, 0, 0.01], [0, 0, 0, 1])
         self.initial_z = None
 
-        if 'r_gripper_finger_link' in self.parts:
-            self.r_gripper_finger_link = self.parts['r_gripper_finger_link']
-        if 'l_gripper_finger_link' in self.parts:
-            self.r_gripper_finger_link = self.parts['l_gripper_finger_link']
+        self.r_gripper_finger_link = self.parts['r_gripper_finger_link']
+        self.l_gripper_finger_link = self.parts['l_gripper_finger_link']
 
     def alive_bonus(self, z, pitch):
         return 2 if abs(z - self.body_xyz[2]) < 0.1 else -4

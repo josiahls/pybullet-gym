@@ -218,13 +218,12 @@ class FetchInternalTrainEnv(BaseFetchEnv, ABC):
     def __init__(self):
         super().__init__()
 
-        self.randomCeiling = .2#random.uniform(.5, 2)
+        self.randomCeiling = random.uniform(.5, 2)
 
     def create_single_player_scene(self, _p: BulletClient):
         self.scene = PickAndMoveScene(_p, gravity=9.8, timestep=0.0165 / 4, frame_skip=4)
         return self.scene
 
     def get_custom_reward(self):
-        return 0
-        # return (self.robot.l_gripper_finger_link.get_position()[2] - self.randomCeiling) / self.randomCeiling or \
-        #        (self.robot.r_gripper_finger_link.get_position()[2] - self.randomCeiling) / self.randomCeiling
+        return (self.robot.l_gripper_finger_link.get_position()[2] - self.randomCeiling) / self.randomCeiling or \
+               (self.robot.r_gripper_finger_link.get_position()[2] - self.randomCeiling) / self.randomCeiling
