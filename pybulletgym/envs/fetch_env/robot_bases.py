@@ -313,6 +313,7 @@ class Joint:
         self.jointType = joint_info[2]
         self.lowerLimit = joint_info[8]
         self.upperLimit = joint_info[9]
+        self.initialPosition = self.current_position()
         self.jointHasLimits = self.lowerLimit < self.upperLimit
         self.jointMaxVelocity = joint_info[11]
         self.power_coeff = 0

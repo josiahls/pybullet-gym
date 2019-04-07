@@ -25,7 +25,7 @@ class FetchURDF(URDFBasedRobot):
         self.initial_z = None
         self.joint_speeds = []
         self.joints_at_limit = []
-        self.lock_joints = [0] * self.action_space.shape[0]
+        self.lock_joints = [False] * self.action_space.shape[0]
 
         self.pos_after = 0
 
@@ -81,8 +81,11 @@ class FetchURDF(URDFBasedRobot):
         assert (np.isfinite(a).all())
         i = 0
         for n, j in enumerate(self.ordered_joints):
-            if j.power_coef != 0:  # in case the ignored joints are added, they have 0 power
+            if j.power_coef != 0 and not self.lock_joints[n]:  # in case the ignored joints are added, they have 0 power
                 j.set_motor_torque(self.power * j.power_coef * float(np.clip(a[n - i], -1, +1)))
+            elif self.lock_joints[n]:
+                j.set_velocity(0)
+                i += 1
             else:
                 i += 1
 

@@ -237,6 +237,7 @@ class FetchInternalKeepStillTrainEnv(BaseFetchEnv, ABC):
         super().__init__()
 
         self.joints_not_at_limit_cost = .3
+        self.robot.lock_joints = [True] * self.action_space.shape[0]
 
     def create_single_player_scene(self, _p: BulletClient):
         self.scene = PickAndMoveScene(_p, gravity=9.8, timestep=0.0165 / 4, frame_skip=4)
