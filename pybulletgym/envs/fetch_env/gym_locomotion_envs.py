@@ -227,3 +227,26 @@ class FetchInternalTrainEnv(BaseFetchEnv, ABC):
     def get_custom_reward(self):
         return (self.robot.l_gripper_finger_link.get_position()[2] - self.randomCeiling) / self.randomCeiling or \
                (self.robot.r_gripper_finger_link.get_position()[2] - self.randomCeiling) / self.randomCeiling
+
+class FetchInternalKeepStillTrainEnv(BaseFetchEnv, ABC):
+    """
+    The reward functions for this env will involve lifting the arm overhead
+
+    """
+    def __init__(self):
+        super().__init__()
+
+        self.joints_not_at_limit_cost = .3
+
+    def create_single_player_scene(self, _p: BulletClient):
+        self.scene = PickAndMoveScene(_p, gravity=9.8, timestep=0.0165 / 4, frame_skip=4)
+        return self.scene
+
+    def get_custom_reward(self):
+        """
+        Reward Joints that are not breaking their limits.
+
+        :return:
+        """
+        return float(self.joints_not_at_limit_cost * (len(self.robot.ordered_joints) - self.robot.joints_at_limit)) + \
+               float(self.joints_not_at_limit_cost * (len(self.robot.ordered_joints) - self.robot.joints_at_speed_limit))

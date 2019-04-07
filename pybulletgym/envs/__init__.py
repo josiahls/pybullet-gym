@@ -175,6 +175,12 @@ register(
 	max_episode_steps=100000
 )
 
+register(
+	id='FetchInternalKeepStillTrainEnv-v0',
+	entry_point='pybulletgym.envs.fetch_env.gym_locomotion_envs:FetchInternalKeepStillTrainEnv',
+	max_episode_steps=100000
+)
+
 
 def get_list():
 	envs = ['- ' + spec.id for spec in gym.pgym.envs.registry.all() if spec.id.find('Bullet') >= 0 or spec.id.find('MuJoCo') >= 0]
