@@ -170,8 +170,14 @@ register(
 )
 
 register(
-	id='FetchInternalTrainEnv-v0',
-	entry_point='pybulletgym.envs.fetch_env.gym_locomotion_envs:FetchInternalTrainEnv',
+	id='FetchLiftArmHighEnv-v0',
+	entry_point='pybulletgym.envs.fetch_env.gym_locomotion_envs:FetchLiftArmHighEnv',
+	max_episode_steps=100000
+)
+
+register(
+	id='FetchLiftArmLowEnv-v0',
+	entry_point='pybulletgym.envs.fetch_env.gym_locomotion_envs:FetchLiftArmLowEnv',
 	max_episode_steps=100000
 )
 

@@ -210,7 +210,7 @@ class FetchCutBlockEnv_v1(BaseFetchEnv, ABC):
         return self.scene
 
 
-class FetchInternalTrainEnv(BaseFetchEnv, ABC):
+class FetchLiftArmHighEnv(BaseFetchEnv, ABC):
     """
     The reward functions for this env will involve lifting the arm overhead
 
@@ -227,6 +227,35 @@ class FetchInternalTrainEnv(BaseFetchEnv, ABC):
     def get_custom_reward(self):
         return (self.robot.l_gripper_finger_link.get_position()[2] - self.randomCeiling) / self.randomCeiling or \
                (self.robot.r_gripper_finger_link.get_position()[2] - self.randomCeiling) / self.randomCeiling
+
+class FetchLiftArmLowEnv(BaseFetchEnv, ABC):
+    """
+    The reward functions for this env will involve lifting the arm to the ground.
+    It is expected the the robot will try to move the arm around the table.
+
+    """
+
+    def __init__(self):
+        super().__init__()
+
+        self.max_ceiling = 0.7
+        self.min_floor = 0
+        self.randomCeiling = random.uniform(self.min_floor, self.max_ceiling)
+
+    def create_single_player_scene(self, _p: BulletClient):
+        self.scene = PickAndMoveScene(_p, gravity=9.8, timestep=0.0165 / 4, frame_skip=4)
+        return self.scene
+
+    def get_custom_reward(self):
+        # Distance to the arm goal
+        distance = np.linalg.norm(np.subtract([self.randomCeiling, self.randomCeiling],
+                                              [self.robot.l_gripper_finger_link.get_position()[2],
+                                               self.robot.r_gripper_finger_link.get_position()[2]]))
+        # Punish or reward?
+        sign = 1 if distance < (self.max_ceiling - self.min_floor) else -1
+
+        return distance * sign
+
 
 class FetchInternalKeepStillTrainEnv(BaseFetchEnv, ABC):
     """
