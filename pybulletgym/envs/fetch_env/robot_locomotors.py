@@ -85,7 +85,6 @@ class FetchURDF(URDFBasedRobot):
                 j.set_motor_torque(self.power * j.power_coef * float(np.clip(a[n - i], -1, +1)))
             elif self.lock_joints[n]:
                 j.set_velocity(0)
-                i += 1
             else:
                 i += 1
 

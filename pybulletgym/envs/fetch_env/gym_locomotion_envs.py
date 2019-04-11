@@ -166,8 +166,6 @@ class BaseFetchEnv(BaseBulletEnv, ABC):
 
         # Get the env custom reward
         custom_reward = self.get_custom_reward()
-        if abs(custom_reward) > 1:
-            print('WARNING REWARD IS NOT NORMALIZED')
 
         self.rewards = [
             alive,
@@ -219,6 +217,10 @@ class FetchLiftArmHighEnv(BaseFetchEnv, ABC):
         super().__init__()
 
         self.randomCeiling = random.uniform(.5, 2)
+        self.robot.lock_joints = [True] * self.action_space.shape[0]
+        self.robot.lock_joints[11] = False  # Unlock 'shoulder_lift_joint'
+        self.robot.lock_joints[13] = False  # Unlock 'elbow_flex_joint'
+        self.robot.lock_joints[15] = False  # Unlock 'wrist_flex_joint'
 
     def create_single_player_scene(self, _p: BulletClient):
         self.scene = PickAndMoveScene(_p, gravity=9.8, timestep=0.0165 / 4, frame_skip=4)
@@ -227,6 +229,7 @@ class FetchLiftArmHighEnv(BaseFetchEnv, ABC):
     def get_custom_reward(self):
         return (self.robot.l_gripper_finger_link.get_position()[2] - self.randomCeiling) / self.randomCeiling or \
                (self.robot.r_gripper_finger_link.get_position()[2] - self.randomCeiling) / self.randomCeiling
+
 
 class FetchLiftArmLowEnv(BaseFetchEnv, ABC):
     """
@@ -237,6 +240,11 @@ class FetchLiftArmLowEnv(BaseFetchEnv, ABC):
 
     def __init__(self):
         super().__init__()
+        self.robot.lock_joints = [True] * self.action_space.shape[0]
+        self.robot.lock_joints[10] = False  # Unlock 'shoulder_pan_joint'
+        self.robot.lock_joints[11] = False  # Unlock 'shoulder_lift_joint'
+        self.robot.lock_joints[13] = False  # Unlock 'elbow_flex_joint'
+        self.robot.lock_joints[15] = False  # Unlock 'wrist_flex_joint'
 
         self.max_ceiling = 0.7
         self.min_floor = 0
@@ -252,9 +260,9 @@ class FetchLiftArmLowEnv(BaseFetchEnv, ABC):
                                               [self.robot.l_gripper_finger_link.get_position()[2],
                                                self.robot.r_gripper_finger_link.get_position()[2]]))
         # Punish or reward?
-        sign = 1 if distance < (self.max_ceiling - self.min_floor) else -1
+        sign = 5 if distance < (self.max_ceiling - self.min_floor) else -1
 
-        return distance * sign
+        return abs(1 - distance) * sign
 
 
 class FetchInternalKeepStillTrainEnv(BaseFetchEnv, ABC):
@@ -266,10 +274,6 @@ class FetchInternalKeepStillTrainEnv(BaseFetchEnv, ABC):
         super().__init__()
 
         self.joints_not_at_limit_cost = .3
-        self.robot.lock_joints = [True] * self.action_space.shape[0]
-        self.robot.lock_joints[11] = False  # Unlock 'shoulder_lift_joint'
-        self.robot.lock_joints[13] = False  # Unlock 'elbow_flex_joint'
-        self.robot.lock_joints[15] = False  # Unlock 'wrist_flex_joint'
 
     def create_single_player_scene(self, _p: BulletClient):
         self.scene = PickAndMoveScene(_p, gravity=9.8, timestep=0.0165 / 4, frame_skip=4)
