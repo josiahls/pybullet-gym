@@ -38,6 +38,7 @@ class BaseFetchEnv(BaseBulletEnv, ABC):
         self.reward = 0
         self.elapsed_time = 0
         self.max_state_space_object_size = 3
+        self._cam_yaw = 90
         self._p = None
 
     def reset(self):

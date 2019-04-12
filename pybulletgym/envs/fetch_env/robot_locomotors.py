@@ -32,6 +32,7 @@ class FetchURDF(URDFBasedRobot):
         # Update the manipulator fields. We have these are fields so they are easier to interface with
         self.r_gripper_finger_link = None  # type: Joint
         self.l_gripper_finger_link = None  # type: Joint
+        self.gripper_link = None  # type: Joint
 
     def calc_state(self):
         """
@@ -43,8 +44,6 @@ class FetchURDF(URDFBasedRobot):
         """ Get joint information, what joints are at their limits """
         qpos = np.array([j.get_position() for j in self.ordered_joints], dtype=np.float32).flatten()  # shape (25,)
         qvel = np.array([j.get_velocity() for j in self.ordered_joints], dtype=np.float32).flatten()  # shape (25,)
-
-        print(qvel.max())
 
         temp_var = [str(j.current_relative_position()) + ' ' + j.joint_name for j in self.ordered_joints]
         j = np.array([j.current_relative_position() for j in self.ordered_joints], dtype=np.float32).flatten()
@@ -141,6 +140,7 @@ class FetchURDF(URDFBasedRobot):
 
         self.r_gripper_finger_link = self.parts['r_gripper_finger_link']
         self.l_gripper_finger_link = self.parts['l_gripper_finger_link']
+        self.gripper_link = self.parts['gripper_link']
 
     def alive_bonus(self, z, pitch):
         return 2 if abs(z - self.body_xyz[2]) < 0.1 else -4
