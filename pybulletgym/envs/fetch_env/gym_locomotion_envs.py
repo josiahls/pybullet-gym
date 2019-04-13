@@ -11,6 +11,75 @@ from .robot_locomotors import FetchURDF
 from .scene_manipulators import PickKnifeAndCutTestScene, PickAndMoveScene, KnifeCutScene, SceneFetch
 from .scene_object_bases import Features
 
+"""
+Notes, the joints are labeled as follows:
+'0 r_wheel_joint'
+'1 l_wheel_joint'
+'2 torso_lift_joint'
+'3 head_pan_joint'
+'4 head_tilt_joint'
+'5 head_camera_joint'
+'6 head_camera_rgb_joint'
+'7 head_camera_rgb_optical_joint'
+'8 head_camera_depth_joint'
+'9 head_camera_depth_optical_joint'
+'10 shoulder_pan_joint'
+'11 shoulder_lift_joint'
+'12 upperarm_roll_joint'
+'13 elbow_flex_joint'
+'14 forearm_roll_joint'
+'15 wrist_flex_joint'
+'16 wrist_roll_joint'
+'17 gripper_axis'
+'18 r_gripper_finger_joint'
+'19 l_gripper_finger_joint'
+'20 bellows_joint'
+'21 bellows_joint2'
+'22 estop_joint'
+'23 laser_joint'
+'24 torso_fixed_joint'
+"""
+
+
+def d_custom_reward_throw_bone(func):
+    """
+    Depending on the environment. We can look at the present rewards. If the robot has been constantly failing,
+    we can optionally make rewards more rewarding. If they are too rewarding, then we can reduce the reward output.
+
+    Args:
+        func:
+
+    Returns:
+
+    """
+    def func_custom_reward_wrapper(self):
+        # Get the custom reward
+        custom_reward = func(self)
+        # Is there an imbalance?
+        neg_count = np.sum(np.array(self._accumulated_total_rewards) < 0, axis=0)
+        pos_count = np.sum(np.array(self._accumulated_total_rewards) > 0, axis=0)
+        should_balance_neg = neg_count / len(self._accumulated_total_rewards) > self._percent_failure_allowable
+        should_balance_pos = pos_count / len(self._accumulated_total_rewards) > self._percent_success_allowable
+
+        # Augment the reward with the +1 bonus
+        if should_balance_neg and custom_reward > 0:
+            custom_reward = (custom_reward * self._pos_bone)
+            print(f'Augmenting with pos bonus {self._pos_bone}')
+            if self._pos_bone < self._pos_bone_max:
+                self._pos_bone += self._bone_gamma
+        elif should_balance_pos and custom_reward < 0:
+            custom_reward = (custom_reward * self._neg_bone)
+            print(f'Augmenting with neg bonus {self._neg_bone}')
+            if self._neg_bone < self._pos_bone_max:
+                self._neg_bone += self._bone_gamma
+
+        # Decrement the bonus by gamma
+        self._pos_bone = self._pos_bone - (self._pos_bone * self._bone_gamma) if self._pos_bone > self._pos_bone_min else self._pos_bone
+        self._neg_bone = self._neg_bone - (self._neg_bone * self._bone_gamma) if self._neg_bone > self._pos_bone_min else self._neg_bone
+
+        return custom_reward
+    return func_custom_reward_wrapper
+
 
 class BaseFetchEnv(BaseBulletEnv, ABC):
     def __init__(self):
@@ -32,6 +101,19 @@ class BaseFetchEnv(BaseBulletEnv, ABC):
         self.scene = None
         self.potential = 0
         self.rewards = []
+
+        # Handles augmenting the rewards if the robot is failing / succeeding too much
+        self._total_rewards = [0]
+        self._accumulated_total_rewards = [0]
+        self._should_throw_bone = False
+        self._neg_bone = 1
+        self._pos_bone = 1
+        self._pos_bone_max = 5
+        self._pos_bone_min = 0.1
+        self._bone_gamma = 0.0001
+        self._percent_failure_allowable = 0.9
+        self._percent_success_allowable = 0.2
+
         self.stateId = -1
         self.frame = 0
         self.done = 0
@@ -80,6 +162,8 @@ class BaseFetchEnv(BaseBulletEnv, ABC):
         self.done = 0
         self.reward = 0
         self.elapsed_time = 0
+        self._accumulated_total_rewards.append(np.average(self._total_rewards))
+        self._total_rewards = [0]
         s = self.robot.reset(self._p, scene=self.scene)
         self.robot.robot_specific_reset(self._p)
         self.camera._p = self._p
@@ -182,10 +266,15 @@ class BaseFetchEnv(BaseBulletEnv, ABC):
             print(sum(self.rewards))
         self.HUD(state, a, done)
 
+        self._total_rewards.append(sum(self.rewards))
         return state, sum(self.rewards), bool(done), {}
 
+    @d_custom_reward_throw_bone
     def get_custom_reward(self):
         return 0
+
+    def init_robot_pose(self) -> bool:
+        return True
 
 
 class FetchPickKnifeAndCutTestEnv(BaseFetchEnv, ABC):
@@ -203,21 +292,92 @@ class FetchMoveBlockEnv(BaseFetchEnv, ABC):
 
 
 class FetchCutBlockEnv_v1(BaseFetchEnv, ABC):
+    def __init__(self):
+        """
+        Rewards the robot to cutting a block.
+        Inits the arm to be grasping the knife.
+        """
+        super().__init__()
+
+        self.init_positions = [0] * self.action_space.shape[0]
+        self.init_positions[11] = -0.72
+        self.init_positions[12] = -0.2
+        self.init_positions[13] = -0.9
+        self.init_positions[15] = -1.4
+
+        self._index = 0
 
     def create_single_player_scene(self, _p: BulletClient):
         self.scene = KnifeCutScene(_p, gravity=9.8, timestep=0.0165 / 4, frame_skip=4)
         return self.scene
 
+    def init_robot_pose(self):
+        """ UPDATE ACTIONS """
+        if not self.scene.multiplayer:
+            # if multiplayer, action first applied to all robots, then global step() called, then _step()
+            # for all robots with the same actions
+            self.robot.apply_positions(self.init_positions, 0.9)
+            self._index += 1
+        self.scene.global_step()
+
+        """ CALCULATE STATES """
+        # also calculates self.joints_at_limit
+        self.get_full_state()
+
+        if self._index > 160:
+            self.init_positions[18] = 0.015
+            self.init_positions[19] = 0.015
+        else:
+            self.init_positions[18] = 0.05
+            self.init_positions[19] = 0.05
+
+        if self._index > 180:
+            self._index = 0
+            return True
+        else:
+            return False
+
+    @d_custom_reward_throw_bone
+    def get_custom_reward(self):
+        """
+        The reward for this function is increasing the number of scene objects, distance fingers to knife, touching the
+        knife, moving the knife closer to the object.
+
+        Returns:
+        """
+        # Needs more than 2 objects to get reward
+        n_scene_objects = len(self.scene.scene_objects) - 2
+
+        # Inverse distance to the knife
+        if self.scene.scene_objects is None:
+            return 0
+
+        target_positions = [_.get_position() for _ in self.scene.scene_objects if _.filename.__contains__('knife.urdf')]
+        inv_distance = 2 - np.linalg.norm(np.subtract(target_positions,
+                                                      [self.robot.l_gripper_finger_link.get_position(),
+                                                       self.robot.r_gripper_finger_link.get_position()]))
+
+        # Is Touching the knife
+        is_touching = int(inv_distance < .1)
+
+        # Knife is closer to the object
+        for scene_object in self.scene.scene_objects:
+            if scene_object.filename.__contains__('cube_concave.urdf'):
+                inv_distance += 1 - np.linalg.norm(np.subtract(target_positions, scene_object.get_position()))
+
+        return sum([n_scene_objects, inv_distance, is_touching])
+
 
 class FetchLiftArmHighEnv(BaseFetchEnv, ABC):
-    """
-    The reward functions for this env will involve lifting the arm overhead
-
-    """
     def __init__(self):
+        """
+        Rewards the robot to lifting its arm high.
+        """
         super().__init__()
 
-        self.randomCeiling = random.uniform(.5, 2)
+        self.max_ceiling = 2
+        self.min_floor = 0.5
+        self.randomCeiling = random.uniform(self.min_floor, self.max_ceiling)
         self.robot.lock_joints = [True] * self.action_space.shape[0]
         self.robot.lock_joints[11] = False  # Unlock 'shoulder_lift_joint'
         self.robot.lock_joints[13] = False  # Unlock 'elbow_flex_joint'
@@ -227,19 +387,25 @@ class FetchLiftArmHighEnv(BaseFetchEnv, ABC):
         self.scene = PickAndMoveScene(_p, gravity=9.8, timestep=0.0165 / 4, frame_skip=4)
         return self.scene
 
+    @d_custom_reward_throw_bone
     def get_custom_reward(self):
-        return (self.robot.l_gripper_finger_link.get_position()[2] - self.randomCeiling) / self.randomCeiling or \
-               (self.robot.r_gripper_finger_link.get_position()[2] - self.randomCeiling) / self.randomCeiling
+
+        # Distance to the arm goal
+        distance = np.linalg.norm(np.subtract([self.randomCeiling, self.randomCeiling],
+                                              [self.robot.l_gripper_finger_link.get_position()[2],
+                                               self.robot.r_gripper_finger_link.get_position()[2]]))
+        # Punish or reward?
+        sign = 5 if distance < (self.max_ceiling - self.min_floor) else -1
+
+        return abs(1 - distance) * sign
 
 
 class FetchLiftArmLowEnv(BaseFetchEnv, ABC):
-    """
-    The reward functions for this env will involve lifting the arm to the ground.
-    It is expected the the robot will try to move the arm around the table.
-
-    """
-
     def __init__(self):
+        """
+        The reward functions for this env will involve lifting the arm to the ground.
+        It is expected the the robot will try to move the arm around the table.
+        """
         super().__init__()
         self.robot.lock_joints = [True] * self.action_space.shape[0]
         self.robot.lock_joints[10] = False  # Unlock 'shoulder_pan_joint'
@@ -255,6 +421,7 @@ class FetchLiftArmLowEnv(BaseFetchEnv, ABC):
         self.scene = PickAndMoveScene(_p, gravity=9.8, timestep=0.0165 / 4, frame_skip=4)
         return self.scene
 
+    @d_custom_reward_throw_bone
     def get_custom_reward(self):
         # Distance to the arm goal
         distance = np.linalg.norm(np.subtract([self.randomCeiling, self.randomCeiling],
@@ -280,6 +447,7 @@ class FetchInternalKeepStillTrainEnv(BaseFetchEnv, ABC):
         self.scene = PickAndMoveScene(_p, gravity=9.8, timestep=0.0165 / 4, frame_skip=4)
         return self.scene
 
+    @d_custom_reward_throw_bone
     def get_custom_reward(self):
         """
         Reward Joints that are not breaking their limits.

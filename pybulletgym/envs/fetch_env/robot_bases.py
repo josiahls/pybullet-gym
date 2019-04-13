@@ -357,9 +357,9 @@ class Joint:
         _, vx = self.get_state()
         return vx
 
-    def set_position(self, position):
+    def set_position(self, position, maxVelocity = None):
         self._p.setJointMotorControl2(self.bodies[self.bodyIndex], self.jointIndex, pybullet.POSITION_CONTROL,
-                                      targetPosition=position)
+                                      targetPosition=position, maxVelocity=maxVelocity)
 
     def set_velocity(self, velocity):
         self._p.setJointMotorControl2(self.bodies[self.bodyIndex], self.jointIndex, pybullet.VELOCITY_CONTROL,

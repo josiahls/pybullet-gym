@@ -87,6 +87,15 @@ class FetchURDF(URDFBasedRobot):
             else:
                 i += 1
 
+    def apply_positions(self, a, maxVelocity=None):
+        assert (np.isfinite(a).all())
+        i = 0
+        for n, j in enumerate(self.ordered_joints):
+            if j.power_coef != 0:  # in case the ignored joints are added, they have 0 power
+                j.set_position(a[n - i], maxVelocity)
+            else:
+                i += 1
+
     def reset(self, bullet_client, **kwargs):
         self._p = bullet_client
         # self.ordered_joints = []

@@ -73,6 +73,7 @@ class SceneFetch(Scene):
             object_states.append(scene_object.calc_state(self))
         return object_states
 
+
 class PickAndPlaceScene(SceneFetch):
     """
     The goal of this scene is to set up a scene for picking up and moving
@@ -188,6 +189,7 @@ class PickKnifeAndCutTestScene(SceneFetch):
         for scene_object in self.scene_objects:
             scene_object.reload()
 
+
 class PickAndMoveScene(SceneFetch):
     """
     The goal of this scene is to set up a scene for picking up a knife, and cutting a sphere or a square
@@ -275,6 +277,7 @@ class PickAndMoveScene(SceneFetch):
 
                 scene_object.reset_position(object_position)
 
+
 class KnifeCutScene(SceneFetch):
     """
     The goal of this scene is to set up a scene for picking up a knife, and cutting a sphere or a square
@@ -312,7 +315,7 @@ class KnifeCutScene(SceneFetch):
 
             filename = os.path.join(os.path.dirname(__file__), "..", "assets", "things", "knives",
                                     "knife.urdf")
-            self.scene_objects.append(SlicingSceneObject(bullet_client, filename, [0.70, 0.18, 0.7],
+            self.scene_objects.append(SlicingSceneObject(bullet_client, filename, [0.78, 0, 0.67],
                                                          self._p.getQuaternionFromEuler(
                                                              [np.deg2rad(90), 0, np.deg2rad(-90)]),
                                                          flags=pybullet.URDF_USE_MATERIAL_COLORS_FROM_MTL |
@@ -359,14 +362,14 @@ class KnifeCutScene(SceneFetch):
                                     if _.filename.__contains__('knife.urdf')]
 
                 object_position = (
-                    np.random.uniform(.55, 1),
-                    np.random.uniform(-0.5, .51),
+                    np.random.uniform(.58, 1),
+                    np.random.uniform(-0.46, .55),
                     np.random.uniform(.7, .8)
                 )
-                while np.linalg.norm(np.subtract(target_positions, object_position)) < .1:
+                while np.linalg.norm(np.subtract(target_positions, object_position)) < .2:
                     object_position = (
-                        np.random.uniform(.55, 1),
-                        np.random.uniform(-0.5, .51),
+                        np.random.uniform(.58, 1),
+                        np.random.uniform(-0.46, .55),
                         np.random.uniform(.7, .8)
                     )
 
