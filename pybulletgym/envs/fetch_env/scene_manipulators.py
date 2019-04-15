@@ -284,10 +284,11 @@ class KnifeCutScene(SceneFetch):
 
     """
 
-    def __init__(self, bullet_client, gravity, timestep, frame_skip):
+    def __init__(self, bullet_client, gravity, timestep, frame_skip, randomize=False):
         super().__init__(bullet_client, gravity, timestep, frame_skip)
 
         self.multiplayer = False
+        self.randomize = randomize
         self.sceneLoaded = 0
         self.scene_objects = []  # type: List[SceneObject]
         self.object_features = {'pos_x': 0, 'pos_y': 0,
@@ -357,18 +358,18 @@ class KnifeCutScene(SceneFetch):
 
         # Process object positions
         for scene_object in self.scene_objects:
-            if scene_object.filename.__contains__('cube_concave.urdf'):
+            if scene_object.filename.__contains__('cube_concave.urdf') and not self.randomize:
                 target_positions = [_.get_position() for _ in self.scene_objects
                                     if _.filename.__contains__('knife.urdf')]
 
                 object_position = (
-                    np.random.uniform(.58, 1),
+                    np.random.uniform(.68, 1.3),
                     np.random.uniform(-0.46, .55),
                     np.random.uniform(.7, .8)
                 )
                 while np.linalg.norm(np.subtract(target_positions, object_position)) < .2:
                     object_position = (
-                        np.random.uniform(.58, 1),
+                        np.random.uniform(.68, 1.3),
                         np.random.uniform(-0.46, .55),
                         np.random.uniform(.7, .8)
                     )

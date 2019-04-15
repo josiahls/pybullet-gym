@@ -11,7 +11,7 @@ env_list = [
     # 'FetchPickKnifeAndCutTestEnv-v0',
     # 'FetchMoveBlockEnv-v0',
     # 'FetchCutBlockEnv-v1',
-    'FetchInternalTrainEnv-v0',
+    'FetchInternalKeepStillTrainEnv-v0',
 ]
 
 for env_name in env_list:

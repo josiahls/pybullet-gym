@@ -150,7 +150,7 @@ register(
 	max_episode_steps=1000
 )
 
-""" Fetch Envs """
+""" FETCH ENVS """
 register(
 	id='FetchPickKnifeAndCutTestEnv-v0',
 	entry_point='pybulletgym.envs.fetch_env.gym_locomotion_envs:FetchPickKnifeAndCutTestEnv',
@@ -168,6 +168,19 @@ register(
 	entry_point='pybulletgym.envs.fetch_env.gym_locomotion_envs:FetchCutBlockEnv_v1',
 	max_episode_steps=100000
 )
+
+register(
+	id='FetchCutBlockNoKnifeTouchRewardEnv-v1',
+	entry_point='pybulletgym.envs.fetch_env.gym_locomotion_envs:FetchCutBlockNoKnifeTouchRewardEnv_v1',
+	max_episode_steps=100000
+)
+
+register(
+	id='FetchCutBlockRandomEnv-v1',
+	entry_point='pybulletgym.envs.fetch_env.gym_locomotion_envs:FetchCutBlockEnvRandom_v1',
+	max_episode_steps=100000
+)
+
 
 register(
 	id='FetchLiftArmHighEnv-v0',

@@ -55,27 +55,35 @@ def d_custom_reward_throw_bone(func):
     def func_custom_reward_wrapper(self):
         # Get the custom reward
         custom_reward = func(self)
+
         # Is there an imbalance?
         neg_count = np.sum(np.array(self._accumulated_total_rewards) < 0, axis=0)
         pos_count = np.sum(np.array(self._accumulated_total_rewards) > 0, axis=0)
-        should_balance_neg = neg_count / len(self._accumulated_total_rewards) > self._percent_failure_allowable
-        should_balance_pos = pos_count / len(self._accumulated_total_rewards) > self._percent_success_allowable
+
+        # Don't start balancing until after 10 accumulated rewards
+        if neg_count + pos_count < 10 and not self._do_reward_balancing:
+            return custom_reward
+
+        should_balance_neg = neg_count / len(self._accumulated_total_rewards) + \
+                             self._percent_margin < self._percent_failure_allowable
+        should_balance_pos = pos_count / len(self._accumulated_total_rewards) + \
+                             self._percent_margin < self._percent_success_allowable
 
         # Augment the reward with the +1 bonus
-        if should_balance_neg and custom_reward > 0:
+        if should_balance_pos and custom_reward > 0:
             custom_reward = (custom_reward * self._pos_bone)
             print(f'Augmenting with pos bonus {self._pos_bone}')
-            if self._pos_bone < self._pos_bone_max:
+            if self._pos_bone < self._bone_max:
                 self._pos_bone += self._bone_gamma
-        elif should_balance_pos and custom_reward < 0:
+        if should_balance_neg and custom_reward < 0:
             custom_reward = (custom_reward * self._neg_bone)
             print(f'Augmenting with neg bonus {self._neg_bone}')
-            if self._neg_bone < self._pos_bone_max:
+            if self._neg_bone < self._bone_max:
                 self._neg_bone += self._bone_gamma
 
         # Decrement the bonus by gamma
-        self._pos_bone = self._pos_bone - (self._pos_bone * self._bone_gamma) if self._pos_bone > self._pos_bone_min else self._pos_bone
-        self._neg_bone = self._neg_bone - (self._neg_bone * self._bone_gamma) if self._neg_bone > self._pos_bone_min else self._neg_bone
+        self._pos_bone = self._pos_bone - (self._bone_gamma ** 2) if self._pos_bone > self._pos_bone_min else self._pos_bone
+        self._neg_bone = self._neg_bone - (self._bone_gamma ** 2) if self._neg_bone > self._pos_bone_min else self._neg_bone
 
         return custom_reward
     return func_custom_reward_wrapper
@@ -102,23 +110,28 @@ class BaseFetchEnv(BaseBulletEnv, ABC):
         self.potential = 0
         self.rewards = []
 
+        self.joints_are_locked = False
+
         # Handles augmenting the rewards if the robot is failing / succeeding too much
         self._total_rewards = [0]
         self._accumulated_total_rewards = [0]
         self._should_throw_bone = False
         self._neg_bone = 1
         self._pos_bone = 1
-        self._pos_bone_max = 5
+        self._bone_max = 5
         self._pos_bone_min = 0.1
-        self._bone_gamma = 0.0001
+        self._bone_gamma = 0.001
         self._percent_failure_allowable = 0.9
         self._percent_success_allowable = 0.2
+        self._percent_margin = 0.1
+        self._do_reward_balancing = False
 
         self.stateId = -1
         self.frame = 0
         self.done = 0
         self.reward = 0
         self.elapsed_time = 0
+        self.elapsed_time_inc = 0.0
         self.max_state_space_object_size = 3
         self._cam_yaw = 90
         self._p = None
@@ -132,6 +145,7 @@ class BaseFetchEnv(BaseBulletEnv, ABC):
 
         :return:
         """
+        print(f'Setting Environment: Doing Reward Aug? {self._do_reward_balancing} Doing joint locking? {self.joints_are_locked}')
         if self.physicsClientId < 0:
             self.ownsPhysicsClient = True
 
@@ -234,7 +248,7 @@ class BaseFetchEnv(BaseBulletEnv, ABC):
                   f'rpy is {self.robot.body_rpy} rxy is {self.robot.body_xyz}')
 
         # Punish higher amounts of time
-        # self.elapsed_time += 0.01
+        self.elapsed_time += self.elapsed_time_inc
 
         joints_at_limit_cost = float(self.joints_at_limit_cost * self.robot.joints_at_limit)
         joints_at_speed_limit_cost = float(self.joints_at_limit_cost * self.robot.joints_at_speed_limit)
@@ -276,6 +290,15 @@ class BaseFetchEnv(BaseBulletEnv, ABC):
     def init_robot_pose(self) -> bool:
         return True
 
+    def execute_joint_lock(self, should_lock=None):
+        """
+        Each environment has the option to lock actions. This provides an easy way to
+        lock and unlock those actions.
+
+        :return:
+        """
+        pass
+
 
 class FetchPickKnifeAndCutTestEnv(BaseFetchEnv, ABC):
 
@@ -290,8 +313,25 @@ class FetchMoveBlockEnv(BaseFetchEnv, ABC):
         self.scene = PickAndMoveScene(_p, gravity=9.8, timestep=0.0165 / 4, frame_skip=4)
         return self.scene
 
+    def execute_joint_lock(self, should_lock=None):
+        if should_lock is not None and type(should_lock) is bool:
+            self.joints_are_locked = should_lock
 
-class FetchCutBlockEnv_v1(BaseFetchEnv, ABC):
+        if self.joints_are_locked:
+            self.robot.lock_joints = [True] * self.action_space.shape[0]
+            self.robot.lock_joints[10] = False  # Unlock 'shoulder_pan_joint
+            self.robot.lock_joints[11] = False  # Unlock 'shoulder_lift_joint'
+            self.robot.lock_joints[13] = False  # Unlock 'elbow_flex_joint'
+            self.robot.lock_joints[15] = False  # Unlock 'wrist_flex_joint'
+            self.robot.lock_joints[18] = False  # Unlock 'r_gripper_finger_joint'
+            self.robot.lock_joints[19] = False  # Unlock 'l_gripper_finger_joint'
+        else:
+            self.robot.lock_joints = [False] * self.action_space.shape[0]
+
+        self.joints_are_locked = not self.joints_are_locked
+
+
+class FetchCutBlockEnvRandom_v1(BaseFetchEnv, ABC):
     def __init__(self):
         """
         Rewards the robot to cutting a block.
@@ -360,12 +400,220 @@ class FetchCutBlockEnv_v1(BaseFetchEnv, ABC):
         # Is Touching the knife
         is_touching = int(inv_distance < .1)
 
+        inv_distance_to_cube = 0
+
         # Knife is closer to the object
         for scene_object in self.scene.scene_objects:
             if scene_object.filename.__contains__('cube_concave.urdf'):
-                inv_distance += 1 - np.linalg.norm(np.subtract(target_positions, scene_object.get_position()))
+                inv_distance_to_cube += 1 - np.linalg.norm(np.subtract(target_positions, scene_object.get_position()))
 
-        return sum([n_scene_objects, inv_distance, is_touching])
+        return sum([n_scene_objects, inv_distance, inv_distance_to_cube, is_touching])
+
+    def execute_joint_lock(self, should_lock=None):
+        if should_lock is not None and type(should_lock) is bool:
+            self.joints_are_locked = should_lock
+        if self.joints_are_locked:
+            self.robot.lock_joints = [True] * self.action_space.shape[0]
+            self.robot.lock_joints[10] = False  # Unlock 'shoulder_pan_joint
+            self.robot.lock_joints[11] = False  # Unlock 'shoulder_lift_joint'
+            self.robot.lock_joints[13] = False  # Unlock 'elbow_flex_joint'
+            # self.robot.lock_joints[15] = False  # Unlock 'wrist_flex_joint'
+            self.robot.lock_joints[18] = False  # Unlock 'r_gripper_finger_joint'
+            self.robot.lock_joints[19] = False  # Unlock 'l_gripper_finger_joint'
+        else:
+            self.robot.lock_joints = [False] * self.action_space.shape[0]
+
+        self.joints_are_locked = not self.joints_are_locked
+
+
+class FetchCutBlockEnv_v1(BaseFetchEnv, ABC):
+    def __init__(self):
+        """
+        Rewards the robot to cutting a block.
+        Inits the arm to be grasping the knife.
+        """
+        super().__init__()
+
+        self.init_positions = [0] * self.action_space.shape[0]
+        self.init_positions[11] = -0.72
+        self.init_positions[12] = -0.2
+        self.init_positions[13] = -0.9
+        self.init_positions[15] = -1.4
+
+        self._index = 0
+
+    def create_single_player_scene(self, _p: BulletClient):
+        self.scene = KnifeCutScene(_p, gravity=9.8, timestep=0.0165 / 4, frame_skip=4, randomize=True)
+        return self.scene
+
+    def init_robot_pose(self):
+        """ UPDATE ACTIONS """
+        if not self.scene.multiplayer:
+            # if multiplayer, action first applied to all robots, then global step() called, then _step()
+            # for all robots with the same actions
+            self.robot.apply_positions(self.init_positions, 0.9)
+            self._index += 1
+        self.scene.global_step()
+
+        """ CALCULATE STATES """
+        # also calculates self.joints_at_limit
+        self.get_full_state()
+
+        if self._index > 160:
+            self.init_positions[18] = 0.015
+            self.init_positions[19] = 0.015
+        else:
+            self.init_positions[18] = 0.05
+            self.init_positions[19] = 0.05
+
+        if self._index > 180:
+            self._index = 0
+            return True
+        else:
+            return False
+
+    @d_custom_reward_throw_bone
+    def get_custom_reward(self):
+        """
+        The reward for this function is increasing the number of scene objects, distance fingers to knife, touching the
+        knife, moving the knife closer to the object.
+
+        Returns:
+        """
+        # Needs more than 2 objects to get reward
+        n_scene_objects = len(self.scene.scene_objects) - 2
+
+        # Inverse distance to the knife
+        if self.scene.scene_objects is None:
+            return 0
+
+        target_positions = [_.get_position() for _ in self.scene.scene_objects if _.filename.__contains__('knife.urdf')]
+        inv_distance = 2 - np.linalg.norm(np.subtract(target_positions,
+                                                      [self.robot.l_gripper_finger_link.get_position(),
+                                                       self.robot.r_gripper_finger_link.get_position()]))
+
+        # Is Touching the knife
+        is_touching = int(inv_distance < .1)
+
+        inv_distance_to_cube = 0
+
+        # Knife is closer to the object
+        for scene_object in self.scene.scene_objects:
+            if scene_object.filename.__contains__('cube_concave.urdf'):
+                inv_distance_to_cube += 1 - np.linalg.norm(np.subtract(target_positions, scene_object.get_position()))
+
+        return sum([n_scene_objects, inv_distance, inv_distance_to_cube, is_touching])
+
+    def execute_joint_lock(self, should_lock=None):
+        if should_lock is not None and type(should_lock) is bool:
+            self.joints_are_locked = should_lock
+        if self.joints_are_locked:
+            self.robot.lock_joints = [True] * self.action_space.shape[0]
+            self.robot.lock_joints[10] = False  # Unlock 'shoulder_pan_joint
+            self.robot.lock_joints[11] = False  # Unlock 'shoulder_lift_joint'
+            self.robot.lock_joints[13] = False  # Unlock 'elbow_flex_joint'
+            # self.robot.lock_joints[15] = False  # Unlock 'wrist_flex_joint'
+            self.robot.lock_joints[18] = False  # Unlock 'r_gripper_finger_joint'
+            self.robot.lock_joints[19] = False  # Unlock 'l_gripper_finger_joint'
+        else:
+            self.robot.lock_joints = [False] * self.action_space.shape[0]
+
+        self.joints_are_locked = not self.joints_are_locked
+
+
+class FetchCutBlockNoKnifeTouchRewardEnv_v1(BaseFetchEnv, ABC):
+    def __init__(self):
+        """
+        Rewards the robot to cutting a block.
+        Inits the arm to be grasping the knife.
+        """
+        super().__init__()
+
+        self.init_positions = [0] * self.action_space.shape[0]
+        self.init_positions[11] = -0.72
+        self.init_positions[12] = -0.2
+        self.init_positions[13] = -0.9
+        self.init_positions[15] = -1.4
+
+        self._index = 0
+
+    def create_single_player_scene(self, _p: BulletClient):
+        self.scene = KnifeCutScene(_p, gravity=9.8, timestep=0.0165 / 4, frame_skip=4, randomize=True)
+        return self.scene
+
+    def init_robot_pose(self):
+        """ UPDATE ACTIONS """
+        if not self.scene.multiplayer:
+            # if multiplayer, action first applied to all robots, then global step() called, then _step()
+            # for all robots with the same actions
+            self.robot.apply_positions(self.init_positions, 0.9)
+            self._index += 1
+        self.scene.global_step()
+
+        """ CALCULATE STATES """
+        # also calculates self.joints_at_limit
+        self.get_full_state()
+
+        if self._index > 160:
+            self.init_positions[18] = 0.015
+            self.init_positions[19] = 0.015
+        else:
+            self.init_positions[18] = 0.05
+            self.init_positions[19] = 0.05
+
+        if self._index > 180:
+            self._index = 0
+            return True
+        else:
+            return False
+
+    @d_custom_reward_throw_bone
+    def get_custom_reward(self):
+        """
+        The reward for this function is increasing the number of scene objects, distance fingers to knife, touching the
+        knife, moving the knife closer to the object.
+
+        Returns:
+        """
+        # Needs more than 2 objects to get reward
+        n_scene_objects = len(self.scene.scene_objects) - 2
+
+        # Inverse distance to the knife
+        if self.scene.scene_objects is None:
+            return 0
+
+        target_positions = [_.get_position() for _ in self.scene.scene_objects if _.filename.__contains__('knife.urdf')]
+        inv_distance = 2 - np.linalg.norm(np.subtract(target_positions,
+                                                      [self.robot.l_gripper_finger_link.get_position(),
+                                                       self.robot.r_gripper_finger_link.get_position()]))
+
+        # Is Touching the knife
+        is_touching = 0  # int(inv_distance < .1)
+
+        inv_distance_to_cube = 0
+
+        # Knife is closer to the object
+        for scene_object in self.scene.scene_objects:
+            if scene_object.filename.__contains__('cube_concave.urdf'):
+                inv_distance_to_cube += 1 - np.linalg.norm(np.subtract(target_positions, scene_object.get_position()))
+
+        return sum([n_scene_objects, inv_distance, inv_distance_to_cube, is_touching])
+
+    def execute_joint_lock(self, should_lock=None):
+        if should_lock is not None and type(should_lock) is bool:
+            self.joints_are_locked = should_lock
+        if self.joints_are_locked:
+            self.robot.lock_joints = [True] * self.action_space.shape[0]
+            self.robot.lock_joints[10] = False  # Unlock 'shoulder_pan_joint
+            self.robot.lock_joints[11] = False  # Unlock 'shoulder_lift_joint'
+            self.robot.lock_joints[13] = False  # Unlock 'elbow_flex_joint'
+            # self.robot.lock_joints[15] = False  # Unlock 'wrist_flex_joint'
+            self.robot.lock_joints[18] = False  # Unlock 'r_gripper_finger_joint'
+            self.robot.lock_joints[19] = False  # Unlock 'l_gripper_finger_joint'
+        else:
+            self.robot.lock_joints = [False] * self.action_space.shape[0]
+
+        self.joints_are_locked = not self.joints_are_locked
 
 
 class FetchLiftArmHighEnv(BaseFetchEnv, ABC):
@@ -378,10 +626,6 @@ class FetchLiftArmHighEnv(BaseFetchEnv, ABC):
         self.max_ceiling = 2
         self.min_floor = 0.5
         self.randomCeiling = random.uniform(self.min_floor, self.max_ceiling)
-        self.robot.lock_joints = [True] * self.action_space.shape[0]
-        self.robot.lock_joints[11] = False  # Unlock 'shoulder_lift_joint'
-        self.robot.lock_joints[13] = False  # Unlock 'elbow_flex_joint'
-        self.robot.lock_joints[15] = False  # Unlock 'wrist_flex_joint'
 
     def create_single_player_scene(self, _p: BulletClient):
         self.scene = PickAndMoveScene(_p, gravity=9.8, timestep=0.0165 / 4, frame_skip=4)
@@ -397,7 +641,22 @@ class FetchLiftArmHighEnv(BaseFetchEnv, ABC):
         # Punish or reward?
         sign = 5 if distance < (self.max_ceiling - self.min_floor) else -1
 
-        return abs(1 - distance) * sign
+        return abs(1 - distance / self.max_ceiling) * sign
+
+    def execute_joint_lock(self, should_lock=None):
+        if should_lock is not None and type(should_lock) is bool:
+            self.joints_are_locked = should_lock
+
+        if self.joints_are_locked:
+            self.robot.lock_joints = [True] * self.action_space.shape[0]
+            self.robot.lock_joints[10] = False  # Unlock 'shoulder_pan_joint
+            self.robot.lock_joints[11] = False  # Unlock 'shoulder_lift_joint'
+            self.robot.lock_joints[13] = False  # Unlock 'elbow_flex_joint'
+            self.robot.lock_joints[15] = False  # Unlock 'wrist_flex_joint'
+        else:
+            self.robot.lock_joints = [False] * self.action_space.shape[0]
+
+        self.joints_are_locked = not self.joints_are_locked
 
 
 class FetchLiftArmLowEnv(BaseFetchEnv, ABC):
@@ -407,11 +666,6 @@ class FetchLiftArmLowEnv(BaseFetchEnv, ABC):
         It is expected the the robot will try to move the arm around the table.
         """
         super().__init__()
-        self.robot.lock_joints = [True] * self.action_space.shape[0]
-        self.robot.lock_joints[10] = False  # Unlock 'shoulder_pan_joint'
-        self.robot.lock_joints[11] = False  # Unlock 'shoulder_lift_joint'
-        self.robot.lock_joints[13] = False  # Unlock 'elbow_flex_joint'
-        self.robot.lock_joints[15] = False  # Unlock 'wrist_flex_joint'
 
         self.max_ceiling = 0.7
         self.min_floor = 0
@@ -430,7 +684,22 @@ class FetchLiftArmLowEnv(BaseFetchEnv, ABC):
         # Punish or reward?
         sign = 5 if distance < (self.max_ceiling - self.min_floor) else -1
 
-        return abs(1 - distance) * sign
+        return abs(1 - distance / self.max_ceiling) * sign
+
+    def execute_joint_lock(self, should_lock=None):
+        if should_lock is not None and type(should_lock) is bool:
+            self.joints_are_locked = should_lock
+
+        if self.joints_are_locked:
+            self.robot.lock_joints = [True] * self.action_space.shape[0]
+            self.robot.lock_joints[10] = False  # Unlock 'shoulder_pan_joint
+            self.robot.lock_joints[11] = False  # Unlock 'shoulder_lift_joint'
+            self.robot.lock_joints[13] = False  # Unlock 'elbow_flex_joint'
+            self.robot.lock_joints[15] = False  # Unlock 'wrist_flex_joint'
+        else:
+            self.robot.lock_joints = [False] * self.action_space.shape[0]
+
+        self.joints_are_locked = not self.joints_are_locked
 
 
 class FetchInternalKeepStillTrainEnv(BaseFetchEnv, ABC):
@@ -456,3 +725,20 @@ class FetchInternalKeepStillTrainEnv(BaseFetchEnv, ABC):
         """
         return float(self.joints_not_at_limit_cost * (len(self.robot.ordered_joints) - self.robot.joints_at_limit)) + \
                float(self.joints_not_at_limit_cost * (len(self.robot.ordered_joints) - self.robot.joints_at_speed_limit))
+
+    def execute_joint_lock(self, should_lock=None):
+        if should_lock is not None and type(should_lock) is bool:
+            self.joints_are_locked = should_lock
+
+        if self.joints_are_locked:
+            self.robot.lock_joints = [True] * self.action_space.shape[0]
+            self.robot.lock_joints[10] = False  # Unlock 'shoulder_pan_joint
+            self.robot.lock_joints[11] = False  # Unlock 'shoulder_lift_joint'
+            self.robot.lock_joints[13] = False  # Unlock 'elbow_flex_joint'
+            self.robot.lock_joints[15] = False  # Unlock 'wrist_flex_joint'
+            self.robot.lock_joints[18] = False  # Unlock 'r_gripper_finger_joint'
+            self.robot.lock_joints[19] = False  # Unlock 'l_gripper_finger_joint'
+        else:
+            self.robot.lock_joints = [False] * self.action_space.shape[0]
+
+        self.joints_are_locked = not self.joints_are_locked
