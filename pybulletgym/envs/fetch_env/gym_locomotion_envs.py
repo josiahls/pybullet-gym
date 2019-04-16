@@ -392,7 +392,7 @@ class FetchCutBlockEnvRandom_v1(BaseFetchEnv, ABC):
         if self.scene.scene_objects is None:
             return 0
 
-        target_positions = [_.get_position() for _ in self.scene.scene_objects if _.filename.__contains__('knife.urdf')]
+        target_positions = [_.get_position() for _ in self.scene.scene_objects if _.filename is not None and _.filename.__contains__('knife.urdf')]
         inv_distance = 2 - np.linalg.norm(np.subtract(target_positions,
                                                       [self.robot.l_gripper_finger_link.get_position(),
                                                        self.robot.r_gripper_finger_link.get_position()]))
@@ -487,7 +487,7 @@ class FetchCutBlockEnv_v1(BaseFetchEnv, ABC):
         if self.scene.scene_objects is None:
             return 0
 
-        target_positions = [_.get_position() for _ in self.scene.scene_objects if _.filename.__contains__('knife.urdf')]
+        target_positions = [_.get_position() for _ in self.scene.scene_objects if _.filename is not None and _.filename.__contains__('knife.urdf')]
         inv_distance = 2 - np.linalg.norm(np.subtract(target_positions,
                                                       [self.robot.l_gripper_finger_link.get_position(),
                                                        self.robot.r_gripper_finger_link.get_position()]))
@@ -582,7 +582,7 @@ class FetchCutBlockNoKnifeTouchRewardEnv_v1(BaseFetchEnv, ABC):
         if self.scene.scene_objects is None:
             return 0
 
-        target_positions = [_.get_position() for _ in self.scene.scene_objects if _.filename.__contains__('knife.urdf')]
+        target_positions = [_.get_position() for _ in self.scene.scene_objects if _.filename is not None and _.filename.__contains__('knife.urdf')]
         inv_distance = 2 - np.linalg.norm(np.subtract(target_positions,
                                                       [self.robot.l_gripper_finger_link.get_position(),
                                                        self.robot.r_gripper_finger_link.get_position()]))
