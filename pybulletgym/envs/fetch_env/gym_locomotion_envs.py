@@ -627,6 +627,34 @@ class FetchLiftArmHighEnv(BaseFetchEnv, ABC):
         self.min_floor = 0.5
         self.randomCeiling = random.uniform(self.min_floor, self.max_ceiling)
 
+        self.init_positions = [0] * self.action_space.shape[0]
+        self._index = 0
+
+    def init_robot_pose(self):
+        """ UPDATE ACTIONS """
+        if not self.scene.multiplayer:
+            # if multiplayer, action first applied to all robots, then global step() called, then _step()
+            # for all robots with the same actions
+            self.robot.apply_positions(self.init_positions, 0.9)
+            self._index += 1
+        self.scene.global_step()
+
+        if self._index <= 1:
+            self.init_positions[10] = random.uniform(-1.3, 1.3)  # shoulder_pan_joint
+            self.init_positions[11] = random.uniform(-0.72, 0)  # shoulder_lift_joint
+            self.init_positions[12] = random.uniform(-0.4, 0.4)  # upperarm_roll_joint
+            self.init_positions[13] = random.uniform(0.0, 0.9)  # elbow_flex_joint
+
+        """ CALCULATE STATES """
+        # also calculates self.joints_at_limit
+        self.get_full_state()
+
+        if self._index > 180:
+            self._index = 0
+            return True
+        else:
+            return False
+
     def create_single_player_scene(self, _p: BulletClient):
         self.scene = PickAndMoveScene(_p, gravity=9.8, timestep=0.0165 / 4, frame_skip=4)
         return self.scene
@@ -667,9 +695,37 @@ class FetchLiftArmLowEnv(BaseFetchEnv, ABC):
         """
         super().__init__()
 
+        self._index = 0
         self.max_ceiling = 0.7
         self.min_floor = 0
         self.randomCeiling = random.uniform(self.min_floor, self.max_ceiling)
+
+        self.init_positions = [0] * self.action_space.shape[0]
+
+    def init_robot_pose(self):
+        """ UPDATE ACTIONS """
+        if not self.scene.multiplayer:
+            # if multiplayer, action first applied to all robots, then global step() called, then _step()
+            # for all robots with the same actions
+            self.robot.apply_positions(self.init_positions, 0.9)
+            self._index += 1
+        self.scene.global_step()
+
+        """ CALCULATE STATES """
+        # also calculates self.joints_at_limit
+        self.get_full_state()
+
+        if self._index <= 1:
+            self.init_positions[10] = random.uniform(-1.3, 1.3)  # shoulder_pan_joint
+            self.init_positions[11] = random.uniform(-0.72, 0)  # shoulder_lift_joint
+            self.init_positions[12] = random.uniform(-0.4, 0.4)  # upperarm_roll_joint
+            self.init_positions[13] = random.uniform(0.0, 0.9)  # elbow_flex_joint
+
+        if self._index > 180:
+            self._index = 0
+            return True
+        else:
+            return False
 
     def create_single_player_scene(self, _p: BulletClient):
         self.scene = PickAndMoveScene(_p, gravity=9.8, timestep=0.0165 / 4, frame_skip=4)
