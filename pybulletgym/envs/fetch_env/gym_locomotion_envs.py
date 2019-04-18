@@ -137,7 +137,8 @@ class BaseFetchEnv(BaseBulletEnv, ABC):
         self.reward = 0.0
         self.elapsed_time = 0
         self.elapsed_time_cost = 0.0
-        self.mex_step_length = 100
+        self.max_step_length = 100
+        self.min_step_length = 20
         self.max_state_space_object_size = 3
         self._cam_yaw = 90
         self._p = None
@@ -326,14 +327,15 @@ class BaseFetchEnv(BaseBulletEnv, ABC):
             print("sum rewards")
             print(sum(self.rewards))
 
-        done = alive < 0
+        # If the robot has died, and the elasped
+        done = alive < 0 and self.elapsed_time > self.min_step_length
         if not np.isfinite(state).all():
             print("~INF~", state)
             done = True
         if done:
             print(f'Done because: state[0] is {state[0][0]} and the initial z is: {self.robot.initial_z} and the rpy '
                   f'rpy is {self.robot.body_rpy} rxy is {self.robot.body_xyz}')
-        if not done and self.elapsed_time > self.mex_step_length:
+        if not done and self.elapsed_time > self.max_step_length:
             done = True
 
         if alive < 0:
