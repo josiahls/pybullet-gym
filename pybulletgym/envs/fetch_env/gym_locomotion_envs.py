@@ -373,6 +373,31 @@ class FetchPickKnifeAndCutTestEnv(BaseFetchEnv, ABC):
 
 class FetchMoveBlockEnv(BaseFetchEnv, ABC):
 
+    def __init__(self):
+        super().__init__()
+        self.init_positions = [0] * self.action_space.shape[0]
+        self.init_positions[11] = -0.2
+        self._index = 0
+
+    def init_robot_pose(self):
+        """ UPDATE ACTIONS """
+        if not self.scene.multiplayer:
+            # if multiplayer, action first applied to all robots, then global step() called, then _step()
+            # for all robots with the same actions
+            self.robot.apply_positions(self.init_positions, 0.9)
+            self._index += 1
+        self.scene.global_step()
+
+        """ CALCULATE STATES """
+        # also calculates self.joints_at_limit
+        self.get_full_state()
+
+        if self._index > 50:
+            self._index = 0
+            return True
+        else:
+            return False
+
     def create_single_player_scene(self, _p: BulletClient):
         self.scene = PickAndMoveScene(_p, gravity=9.8, timestep=0.0165 / 4, frame_skip=4)
         return self.scene
@@ -853,6 +878,28 @@ class FetchInternalKeepStillTrainEnv(BaseFetchEnv, ABC):
         super().__init__()
 
         self.joints_not_at_limit_cost = .3
+        self.init_positions = [0] * self.action_space.shape[0]
+        self.init_positions[11] = -0.2
+        self._index = 0
+
+    def init_robot_pose(self):
+        """ UPDATE ACTIONS """
+        if not self.scene.multiplayer:
+            # if multiplayer, action first applied to all robots, then global step() called, then _step()
+            # for all robots with the same actions
+            self.robot.apply_positions(self.init_positions, 0.9)
+            self._index += 1
+        self.scene.global_step()
+
+        """ CALCULATE STATES """
+        # also calculates self.joints_at_limit
+        self.get_full_state()
+
+        if self._index > 50:
+            self._index = 0
+            return True
+        else:
+            return False
 
     def create_single_player_scene(self, _p: BulletClient):
         self.scene = PickAndMoveScene(_p, gravity=9.8, timestep=0.0165 / 4, frame_skip=4)
