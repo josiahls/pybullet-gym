@@ -113,12 +113,12 @@ class BaseFetchEnv(BaseBulletEnv, ABC):
         self.joints_are_locked = False
 
         # Handles augmenting the rewards if the robot is failing / succeeding too much
-        self._total_rewards = [0]
-        self._accumulated_total_rewards = [0]
+        self._total_rewards = [0.0]
+        self._accumulated_total_rewards = [0.0]
         self._should_throw_bone = False
-        self._neg_bone = 1
-        self._pos_bone = 1
-        self._bone_max = 5
+        self._neg_bone = 1.0
+        self._pos_bone = 1.0
+        self._bone_max = 5.0
         self._pos_bone_min = 0.1
         self._bone_gamma = 0.001
         self._percent_failure_allowable = 0.9
@@ -129,7 +129,7 @@ class BaseFetchEnv(BaseBulletEnv, ABC):
         self.stateId = -1
         self.frame = 0
         self.done = 0
-        self.reward = 0
+        self.reward = 0.0
         self.elapsed_time = 0
         self.elapsed_time_cost = 0.0
         self.mex_step_length = 100
