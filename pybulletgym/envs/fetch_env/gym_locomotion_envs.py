@@ -284,7 +284,7 @@ class BaseFetchEnv(BaseBulletEnv, ABC):
 
         if alive < 0:
             # If the robot is no longer alive due to falling over, then ensure that we return the worst possible reward
-            self.rewards = [min(self._total_rewards)]
+            self.rewards = [min(self._accumulated_total_rewards)]
 
         self.HUD(state, a, done)
         self._total_rewards.append(sum(self.rewards))
