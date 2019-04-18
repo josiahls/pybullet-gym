@@ -10,6 +10,7 @@ from .env_bases import BaseBulletEnv
 from .robot_locomotors import FetchURDF
 from .scene_manipulators import PickKnifeAndCutTestScene, PickAndMoveScene, KnifeCutScene, SceneFetch
 from .scene_object_bases import Features
+import os
 
 """
 Notes, the joints are labeled as follows:
@@ -52,6 +53,7 @@ def d_custom_reward_throw_bone(func):
     Returns:
 
     """
+
     def func_custom_reward_wrapper(self):
         # Get the custom reward
         custom_reward = func(self)
@@ -82,10 +84,13 @@ def d_custom_reward_throw_bone(func):
                 self._neg_bone += self._bone_gamma
 
         # Decrement the bonus by gamma
-        self._pos_bone = self._pos_bone - (self._bone_gamma ** 2) if self._pos_bone > self._pos_bone_min else self._pos_bone
-        self._neg_bone = self._neg_bone - (self._bone_gamma ** 2) if self._neg_bone > self._pos_bone_min else self._neg_bone
+        self._pos_bone = self._pos_bone - (
+                    self._bone_gamma ** 2) if self._pos_bone > self._pos_bone_min else self._pos_bone
+        self._neg_bone = self._neg_bone - (
+                    self._bone_gamma ** 2) if self._neg_bone > self._pos_bone_min else self._neg_bone
 
         return custom_reward
+
     return func_custom_reward_wrapper
 
 
@@ -137,6 +142,18 @@ class BaseFetchEnv(BaseBulletEnv, ABC):
         self._cam_yaw = 90
         self._p = None
 
+        self.use_normalization = False
+        # Check if there exist cached min max information for normalization
+        if os.path.exists('./robot_state_min_max.npy'):
+            self.robot_state_min_max = np.load('./robot_state_min_max.npy')
+        else:
+            self.robot_state_min_max = None
+
+        if os.path.exists('./object_states_min_max.npy'):
+            self.object_states_min_max = np.load('./object_states_min_max.npy')
+        else:
+            self.object_states_min_max = None
+
     def reset(self):
         """
         More Fetch specific reset functionality.
@@ -146,7 +163,13 @@ class BaseFetchEnv(BaseBulletEnv, ABC):
 
         :return:
         """
-        print(f'Setting Environment: Doing Reward Aug? {self._do_reward_balancing} Doing joint locking? {self.joints_are_locked}')
+        print(f'Setting Environment: Doing Reward Aug? {self._do_reward_balancing} Doing joint locking? '
+              f'{self.joints_are_locked}')
+        if self.object_states_min_max is not None and self.robot_state_min_max is not None:
+            # Save the normalization fields:
+            np.save('./object_states_min_max', self.object_states_min_max)
+            np.save('./robot_state_min_max', self.robot_state_min_max)
+
         if self.physicsClientId < 0:
             self.ownsPhysicsClient = True
 
@@ -190,7 +213,6 @@ class BaseFetchEnv(BaseBulletEnv, ABC):
 
         # Load dynamic objects
         self.scene.dynamic_object_load(self._p)
-
         return s
 
     def create_single_player_scene(self, _p: BulletClient):
@@ -213,6 +235,10 @@ class BaseFetchEnv(BaseBulletEnv, ABC):
         # Get the state of the robot
         state = self.robot.calc_state().reshape((1, -1))
         object_states = self.scene.calc_state()
+
+        if self.use_normalization:
+            state, object_states = self._normalize_states(state, object_states)
+
         for i, object_state in enumerate(object_states):
             if i < self.max_state_space_object_size:
                 state = np.hstack((state, np.array(object_state).reshape((1, -1))))
@@ -221,6 +247,34 @@ class BaseFetchEnv(BaseBulletEnv, ABC):
             state = np.hstack((state, np.zeros((1, len(Features())))))
 
         return state
+
+    def _normalize_states(self, robot_state, object_states):
+        # Init the fields if needed
+        if self.robot_state_min_max is None:
+            self.robot_state_min_max = np.ones(np.array(robot_state).shape)
+            self.robot_state_min_max = np.vstack((self.robot_state_min_max, np.min(robot_state, axis=0)))
+        else:
+            # If it is not none, look at the robot state, the current min max
+            min_max_slice = np.vstack((robot_state, self.robot_state_min_max))
+            self.robot_state_min_max[0] = np.max(min_max_slice, axis=0)
+            self.robot_state_min_max[1] = np.min(min_max_slice, axis=0)
+
+        if self.object_states_min_max is None:
+            self.object_states_min_max = np.ones(np.array(object_states).shape)
+            self.object_states_min_max = np.vstack((self.object_states_min_max, np.min(object_states, axis=0)))
+        else:
+            # If it is not none, look at the robot state, the current min max
+            min_max_slice = np.vstack((object_states, self.object_states_min_max))
+            self.object_states_min_max[0] = np.max(min_max_slice, axis=0)
+            self.object_states_min_max[1] = np.min(min_max_slice, axis=0)
+
+        # Normalize the states
+        robot_state = (robot_state - self.robot_state_min_max[1]) / \
+                      (self.robot_state_min_max[0] - self.robot_state_min_max[1])
+        object_states = (object_states - self.object_states_min_max[1]) / \
+                        (self.object_states_min_max[0] - self.object_states_min_max[1])
+
+        return robot_state, object_states
 
     def step(self, a):
         """ UPDATE ACTIONS """
@@ -400,7 +454,8 @@ class FetchCutBlockEnvRandom_v1(BaseFetchEnv, ABC):
         if self.scene.scene_objects is None:
             return 0
 
-        target_positions = [_.get_position() for _ in self.scene.scene_objects if _.filename is not None and _.filename.__contains__('knife.urdf')]
+        target_positions = [_.get_position() for _ in self.scene.scene_objects if
+                            _.filename is not None and _.filename.__contains__('knife.urdf')]
         inv_distance = 2 - np.linalg.norm(np.subtract(target_positions,
                                                       [self.robot.l_gripper_finger_link.get_position(),
                                                        self.robot.r_gripper_finger_link.get_position()]))
@@ -495,7 +550,8 @@ class FetchCutBlockEnv_v1(BaseFetchEnv, ABC):
         if self.scene.scene_objects is None:
             return 0
 
-        target_positions = [_.get_position() for _ in self.scene.scene_objects if _.filename is not None and _.filename.__contains__('knife.urdf')]
+        target_positions = [_.get_position() for _ in self.scene.scene_objects if
+                            _.filename is not None and _.filename.__contains__('knife.urdf')]
         inv_distance = 2 - np.linalg.norm(np.subtract(target_positions,
                                                       [self.robot.l_gripper_finger_link.get_position(),
                                                        self.robot.r_gripper_finger_link.get_position()]))
@@ -590,7 +646,8 @@ class FetchCutBlockNoKnifeTouchRewardEnv_v1(BaseFetchEnv, ABC):
         if self.scene.scene_objects is None:
             return 0
 
-        target_positions = [_.get_position() for _ in self.scene.scene_objects if _.filename is not None and _.filename.__contains__('knife.urdf')]
+        target_positions = [_.get_position() for _ in self.scene.scene_objects if
+                            _.filename is not None and _.filename.__contains__('knife.urdf')]
         inv_distance = 2 - np.linalg.norm(np.subtract(target_positions,
                                                       [self.robot.l_gripper_finger_link.get_position(),
                                                        self.robot.r_gripper_finger_link.get_position()]))
@@ -771,6 +828,7 @@ class FetchInternalKeepStillTrainEnv(BaseFetchEnv, ABC):
     The reward functions for this env will involve lifting the arm overhead
 
     """
+
     def __init__(self):
         super().__init__()
 
@@ -788,7 +846,8 @@ class FetchInternalKeepStillTrainEnv(BaseFetchEnv, ABC):
         :return:
         """
         return float(self.joints_not_at_limit_cost * (len(self.robot.ordered_joints) - self.robot.joints_at_limit)) + \
-               float(self.joints_not_at_limit_cost * (len(self.robot.ordered_joints) - self.robot.joints_at_speed_limit))
+               float(
+                   self.joints_not_at_limit_cost * (len(self.robot.ordered_joints) - self.robot.joints_at_speed_limit))
 
     def execute_joint_lock(self, should_lock=None):
         if should_lock is not None and type(should_lock) is bool:

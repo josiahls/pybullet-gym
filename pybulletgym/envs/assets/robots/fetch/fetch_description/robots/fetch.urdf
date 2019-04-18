@@ -408,6 +408,10 @@
         <axis xyz="0 1 0"/>
     </joint>
     <link name="r_gripper_finger_link">
+        <contact>
+          <lateral_friction value="100.0"/>
+          <inertia_scaling value="300.0"/>
+        </contact>
         <inertial>
             <origin rpy="0 0 0" xyz="-0.01 0 0"/>
             <mass value="0.0798"/>
@@ -438,6 +442,10 @@
         <!-- <dynamics damping="1.0"/> -->
     </joint>
     <link name="l_gripper_finger_link">
+        <contact>
+          <lateral_friction value="100.0"/>
+          <inertia_scaling value="300.0"/>
+        </contact>
         <inertial>
             <origin rpy="0 0 0" xyz="-0.01 0 0"/>
             <mass value="0.0798"/>
