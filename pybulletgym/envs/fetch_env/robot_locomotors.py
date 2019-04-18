@@ -152,7 +152,8 @@ class FetchURDF(URDFBasedRobot):
         self.gripper_link = self.parts['gripper_link']
 
     def alive_bonus(self, z, pitch):
-        return 2 if abs(z - self.body_xyz[2]) < 0.1 else -4
+        # print(f'alive_bonus: {z} and {self.body_xyz[2]} subtraction is: {z - self.body_xyz[2]}')
+        return 2 if abs(z - self.body_xyz[2]) < 0.05 else -4
         # return +2 if 2 > z > -0.2 and .28 > pitch > -.1 else -1  # 2 here because 17 joints produce a lot of electricity cost just from policy noise, living must be better than dying
 
 

@@ -131,7 +131,8 @@ class BaseFetchEnv(BaseBulletEnv, ABC):
         self.done = 0
         self.reward = 0
         self.elapsed_time = 0
-        self.elapsed_time_inc = 0.0
+        self.elapsed_time_cost = 0.0
+        self.mex_step_length = 100
         self.max_state_space_object_size = 3
         self._cam_yaw = 90
         self._p = None
@@ -174,10 +175,10 @@ class BaseFetchEnv(BaseBulletEnv, ABC):
 
         self.frame = 0
         self.done = 0
-        self.reward = 0
+        self.reward = 0.0
         self.elapsed_time = 0
         self._accumulated_total_rewards.append(np.average(self._total_rewards))
-        self._total_rewards = [0]
+        self._total_rewards = [0.0]
         s = self.robot.reset(self._p, scene=self.scene)
         self.robot.robot_specific_reset(self._p)
         self.camera._p = self._p
@@ -238,17 +239,9 @@ class BaseFetchEnv(BaseBulletEnv, ABC):
         # Otherwise, if the robot is upright, reward it
         # alive = float(self.robot.alive_bonus(state[0][0] + self.robot.initial_z, self.robot.body_rpy))
         alive = float(self.robot.alive_bonus(self.robot.initial_z, self.robot.body_rpy))
-        # alive = 1
-        done = alive < 0
-        if not np.isfinite(state).all():
-            print("~INF~", state)
-            done = True
-        if done:
-            print(f'Done because: state[0] is {state[0][0]} and the initial z is: {self.robot.initial_z} and the rpy '
-                  f'rpy is {self.robot.body_rpy} rxy is {self.robot.body_xyz}')
 
         # Punish higher amounts of time
-        self.elapsed_time += self.elapsed_time_inc
+        self.elapsed_time += 1
 
         joints_at_limit_cost = float(self.joints_at_limit_cost * self.robot.joints_at_limit)
         joints_at_speed_limit_cost = float(self.joints_at_limit_cost * self.robot.joints_at_speed_limit)
@@ -268,7 +261,7 @@ class BaseFetchEnv(BaseBulletEnv, ABC):
 
         self.rewards = [
             alive,
-            -1 * self.elapsed_time,
+            -1 * self.elapsed_time * self.elapsed_time_cost,
             joints_at_limit_cost,
             joints_at_speed_limit_cost,
             custom_reward,
@@ -278,9 +271,24 @@ class BaseFetchEnv(BaseBulletEnv, ABC):
             print(self.rewards)
             print("sum rewards")
             print(sum(self.rewards))
-        self.HUD(state, a, done)
 
+        done = alive < 0
+        if not np.isfinite(state).all():
+            print("~INF~", state)
+            done = True
+        if done:
+            print(f'Done because: state[0] is {state[0][0]} and the initial z is: {self.robot.initial_z} and the rpy '
+                  f'rpy is {self.robot.body_rpy} rxy is {self.robot.body_xyz}')
+        if not done and self.elapsed_time > self.mex_step_length:
+            done = True
+
+        if alive < 0:
+            # If the robot is no longer alive due to falling over, then ensure that we return the worst possible reward
+            self.rewards = [min(self._total_rewards)]
+
+        self.HUD(state, a, done)
         self._total_rewards.append(sum(self.rewards))
+
         return state, sum(self.rewards), bool(done), {}
 
     @d_custom_reward_throw_bone
