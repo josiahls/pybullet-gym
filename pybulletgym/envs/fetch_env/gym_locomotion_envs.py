@@ -426,6 +426,9 @@ class FetchCutBlockEnvRandom_v1(BaseFetchEnv, ABC):
         # also calculates self.joints_at_limit
         self.get_full_state()
 
+        if self._index < 5:
+            self.init_positions[13] = -0.9
+
         if self._index > 160:
             self.init_positions[18] = 0.015
             self.init_positions[19] = 0.015
@@ -434,6 +437,9 @@ class FetchCutBlockEnvRandom_v1(BaseFetchEnv, ABC):
             self.init_positions[19] = 0.05
 
         if self._index > 180:
+            self.init_positions[13] = -0.7
+
+        if self._index > 210:
             self._index = 0
             return True
         else:
@@ -522,6 +528,9 @@ class FetchCutBlockEnv_v1(BaseFetchEnv, ABC):
         # also calculates self.joints_at_limit
         self.get_full_state()
 
+        if self._index < 5:
+            self.init_positions[13] = -0.9
+
         if self._index > 160:
             self.init_positions[18] = 0.015
             self.init_positions[19] = 0.015
@@ -530,6 +539,9 @@ class FetchCutBlockEnv_v1(BaseFetchEnv, ABC):
             self.init_positions[19] = 0.05
 
         if self._index > 180:
+            self.init_positions[13] = -0.7
+
+        if self._index > 210:
             self._index = 0
             return True
         else:
@@ -618,6 +630,9 @@ class FetchCutBlockNoKnifeTouchRewardEnv_v1(BaseFetchEnv, ABC):
         # also calculates self.joints_at_limit
         self.get_full_state()
 
+        if self._index < 5:
+            self.init_positions[13] = -0.9
+
         if self._index > 160:
             self.init_positions[18] = 0.015
             self.init_positions[19] = 0.015
@@ -626,6 +641,9 @@ class FetchCutBlockNoKnifeTouchRewardEnv_v1(BaseFetchEnv, ABC):
             self.init_positions[19] = 0.05
 
         if self._index > 180:
+            self.init_positions[13] = -0.7
+
+        if self._index > 210:
             self._index = 0
             return True
         else:
