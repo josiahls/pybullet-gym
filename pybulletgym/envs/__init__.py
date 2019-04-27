@@ -189,6 +189,19 @@ register(
 )
 
 register(
+	id='FetchSanityTestCartPoleEnv-v0',
+	entry_point='pybulletgym.envs.fetch_env.gym_locomotion_envs:FetchSanityTestCartPoleEnv',
+	max_episode_steps=100000
+)
+
+
+register(
+	id='FetchSanityTestMountainCar-v0',
+	entry_point='pybulletgym.envs.fetch_env.gym_locomotion_envs:FetchSanityTestMountainCar',
+	max_episode_steps=100000
+)
+
+register(
 	id='FetchLiftArmLowEnv-v0',
 	entry_point='pybulletgym.envs.fetch_env.gym_locomotion_envs:FetchLiftArmLowEnv',
 	max_episode_steps=100000

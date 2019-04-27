@@ -85,9 +85,9 @@ def d_custom_reward_throw_bone(func):
 
         # Decrement the bonus by gamma
         self._pos_bone = self._pos_bone - (
-                    self._bone_gamma ** 2) if self._pos_bone > self._pos_bone_min else self._pos_bone
+                self._bone_gamma ** 2) if self._pos_bone > self._pos_bone_min else self._pos_bone
         self._neg_bone = self._neg_bone - (
-                    self._bone_gamma ** 2) if self._neg_bone > self._pos_bone_min else self._neg_bone
+                self._bone_gamma ** 2) if self._neg_bone > self._pos_bone_min else self._neg_bone
 
         return custom_reward
 
@@ -95,7 +95,7 @@ def d_custom_reward_throw_bone(func):
 
 
 class BaseFetchEnv(BaseBulletEnv, ABC):
-    def __init__(self):
+    def __init__(self, is_sanity_test=False):
         """
         BaseFetchEnv is concerned with the following:
         - Fetch robot complexity
@@ -107,8 +107,9 @@ class BaseFetchEnv(BaseBulletEnv, ABC):
         environment creation and testing. Most of all, reduce threat of
         bugs crashing an env training 50% of the way through.
         """
-        self.robot = FetchURDF()
-        BaseBulletEnv.__init__(self, self.robot)
+        if not is_sanity_test:
+            self.robot = FetchURDF()
+            BaseBulletEnv.__init__(self, self.robot)
 
         self.joints_at_limit_cost = -1.
         self.scene = None
@@ -140,20 +141,13 @@ class BaseFetchEnv(BaseBulletEnv, ABC):
         self.max_step_length = 100
         self.min_step_length = 20
         self.max_state_space_object_size = 3
+        self.use_image_as_state = False
+        self.state = None
         self._cam_yaw = 90
         self._p = None
 
         self.use_normalization = False
-        # Check if there exist cached min max information for normalization
-        if os.path.exists('./robot_state_min_max.npy'):
-            self.robot_state_min_max = np.load('./robot_state_min_max.npy')
-        else:
-            self.robot_state_min_max = None
-
-        if os.path.exists('./object_states_min_max.npy'):
-            self.object_states_min_max = np.load('./object_states_min_max.npy')
-        else:
-            self.object_states_min_max = None
+        self.state_min_maxes = {}  # type: dict
 
     def reset(self):
         """
@@ -166,10 +160,9 @@ class BaseFetchEnv(BaseBulletEnv, ABC):
         """
         print(f'Setting Environment: Doing Reward Aug? {self._do_reward_balancing} Doing joint locking? '
               f'{self.joints_are_locked}')
-        if self.object_states_min_max is not None and self.robot_state_min_max is not None:
+        for key in self.state_min_maxes:
             # Save the normalization fields:
-            np.save('./object_states_min_max', self.object_states_min_max)
-            np.save('./robot_state_min_max', self.robot_state_min_max)
+            np.save(key, self.state_min_maxes[key])
 
         if self.physicsClientId < 0:
             self.ownsPhysicsClient = True
@@ -214,6 +207,11 @@ class BaseFetchEnv(BaseBulletEnv, ABC):
 
         # Load dynamic objects
         self.scene.dynamic_object_load(self._p)
+
+        # Update the robot init position if available
+        while not self.init_robot_pose():
+            pass
+
         return s
 
     def create_single_player_scene(self, _p: BulletClient):
@@ -224,58 +222,66 @@ class BaseFetchEnv(BaseBulletEnv, ABC):
         self.camera_x = 0.98 * self.camera_x + (1 - 0.98) * x
         self.camera.move_and_look_at(self.camera_x, y - 2.0, 1.4, x, y, 1.0)
 
-    def get_full_state(self) -> np.array:
+    def get_full_state(self, use_image=False) -> np.array:
         """
         Returns a singular state space 1D representation of the environment's space.
 
         The base env has a fixed limit of number of objects to track, and so if the number
         of objects < max_state_space_object_size then the remaining space is filled with zeros
 
-        :return:
+        If image is None (default) then the environment will use it's default state space representation.
+        This representation will be a combination of joint, object, and robot features.
+
+        Args:
+            image: If not None, will be used for the state space.
+
+        Returns:
+
         """
-        # Get the state of the robot
-        state = self.robot.calc_state().reshape((1, -1))
-        object_states = self.scene.calc_state()
+        self.use_image_as_state = use_image
+        if not self.use_image_as_state:
+            # Get the state of the robot
+            state = self.robot.calc_state().reshape((1, -1))
+            object_states = self.scene.calc_state()
 
-        if self.use_normalization:
-            state, object_states = self._normalize_states(state, object_states)
+            if self.use_normalization:
+                state = self._normalize_states(state, 'robot_state_min_max.npy')
+                object_states = self._normalize_states(state, 'object_states_min_max.npy')
 
-        for i, object_state in enumerate(object_states):
-            if i < self.max_state_space_object_size:
-                state = np.hstack((state, np.array(object_state).reshape((1, -1))))
+            for i, object_state in enumerate(object_states):
+                if i < self.max_state_space_object_size:
+                    state = np.hstack((state, np.array(object_state).reshape((1, -1))))
 
-        for i in range(self.max_state_space_object_size - len(object_states)):
-            state = np.hstack((state, np.zeros((1, len(Features())))))
+            for i in range(self.max_state_space_object_size - len(object_states)):
+                state = np.hstack((state, np.zeros((1, len(Features())))))
 
-        return state
+            self.state = state
+        else:
+            self.state = np.array(self.render(mode="rgb_array") / 255)[::10, ::10, :]
 
-    def _normalize_states(self, robot_state, object_states):
+        return self.state
+
+    def _normalize_states(self, state, filename='robot_state_min_max.npy'):
+        filename = os.path.join('.', 'normalization_weights', filename)
+        # Check if there exist cached min max information for normalization
+        if filename not in self.state_min_maxes and os.path.exists(filename):
+            self.state_min_maxes[filename] = np.load(filename)
+
         # Init the fields if needed
-        if self.robot_state_min_max is None:
-            self.robot_state_min_max = np.ones(np.array(robot_state).shape)
-            self.robot_state_min_max = np.vstack((self.robot_state_min_max, np.min(robot_state, axis=0)))
+        if filename not in self.state_min_maxes:
+            self.state_min_maxes[filename] = np.zeros(np.array(state).shape)
+            self.state_min_maxes[filename] = np.vstack((self.state_min_maxes[filename], np.min(state, axis=0)))
         else:
             # If it is not none, look at the robot state, the current min max
-            min_max_slice = np.vstack((robot_state, self.robot_state_min_max))
-            self.robot_state_min_max[0] = np.max(min_max_slice, axis=0)
-            self.robot_state_min_max[1] = np.min(min_max_slice, axis=0)
-
-        if self.object_states_min_max is None:
-            self.object_states_min_max = np.ones(np.array(object_states).shape)
-            self.object_states_min_max = np.vstack((self.object_states_min_max, np.min(object_states, axis=0)))
-        else:
-            # If it is not none, look at the robot state, the current min max
-            min_max_slice = np.vstack((object_states, self.object_states_min_max))
-            self.object_states_min_max[0] = np.max(min_max_slice, axis=0)
-            self.object_states_min_max[1] = np.min(min_max_slice, axis=0)
+            min_max_slice = np.vstack((state, self.state_min_maxes[filename]))
+            self.state_min_maxes[filename][0] = np.max(min_max_slice, axis=0)
+            self.state_min_maxes[filename][1] = np.min(min_max_slice, axis=0)
 
         # Normalize the states
-        robot_state = (robot_state - self.robot_state_min_max[1]) / \
-                      (self.robot_state_min_max[0] - self.robot_state_min_max[1])
-        object_states = (object_states - self.object_states_min_max[1]) / \
-                        (self.object_states_min_max[0] - self.object_states_min_max[1])
-
-        return robot_state, object_states
+        state = (state - self.state_min_maxes[filename][1]) / \
+                    (self.state_min_maxes[filename][0] - self.state_min_maxes[filename][1] + 0.001)
+        print(f'Current State {state}')
+        return state
 
     def step(self, a):
         """ UPDATE ACTIONS """
@@ -287,7 +293,7 @@ class BaseFetchEnv(BaseBulletEnv, ABC):
 
         """ CALCULATE STATES """
         # also calculates self.joints_at_limit
-        state = self.get_full_state()
+        self.state = self.get_full_state(self.use_image_as_state)
 
         """ CALCULATE REWARDS (internal to the robot)"""
         # For no, the robot will always be alive
@@ -329,8 +335,8 @@ class BaseFetchEnv(BaseBulletEnv, ABC):
 
         # If the robot has died, and the elasped
         done = alive < 0 and self.elapsed_time > self.min_step_length
-        if not np.isfinite(state).all():
-            print("~INF~", state)
+        if not np.isfinite(self.state).all():
+            print("~INF~", self.state)
             done = True
         if done:
             print(f'Done because: state[0] is {state[0][0]} and the initial z is: {self.robot.initial_z} and the rpy '
@@ -342,10 +348,13 @@ class BaseFetchEnv(BaseBulletEnv, ABC):
             # If the robot is no longer alive due to falling over, then ensure that we return the worst possible reward
             self.rewards = [min(self._accumulated_total_rewards)]
 
-        self.HUD(state, a, done)
+        self.HUD(self.state, a, done)
         self._total_rewards.append(sum(self.rewards))
 
-        return state, sum(self.rewards), bool(done), {}
+        return self.state, sum(self.rewards), bool(done), {}
+
+    def get_entropy_state(self):
+        return self.robot.gripper_link.get_position()
 
     @d_custom_reward_throw_bone
     def get_custom_reward(self):
@@ -369,6 +378,145 @@ class FetchPickKnifeAndCutTestEnv(BaseFetchEnv, ABC):
     def create_single_player_scene(self, _p: BulletClient):
         self.scene = PickKnifeAndCutTestScene(_p, gravity=9.8, timestep=0.0165 / 4, frame_skip=4)
         return self.scene
+
+
+class FetchSanityTestCartPoleEnv(BaseFetchEnv, ABC):
+
+    def __init__(self):
+        """
+        Wraps the BaseFetchEnv but for the cart pole env.
+
+        Will be important for knowing that a certain model converges.
+        Needs to subclass most of the parent method calls since the robot will not exist
+        """
+        super().__init__()
+        import gym
+        self.internal_env = gym.make('CartPole-v0')
+        self.action_space = np.zeros((self.internal_env.action_space.n, 1))
+        self.state = None
+
+    def create_single_player_scene(self, _p: BulletClient):
+        return None
+
+    def reset(self):
+        self.frame = 0
+        self.done = 0
+        self.reward = 0.0
+        self.elapsed_time = 0
+        self._accumulated_total_rewards.append(np.average(self._total_rewards))
+        self._total_rewards = [0.0]
+        self.state = self.internal_env.reset()
+        self.state = np.reshape(self.state, [1, self.internal_env.observation_space.shape[0]])
+
+        print(f'Setting Environment: Doing Reward Aug? {self._do_reward_balancing} Doing joint locking? '
+              f'{self.joints_are_locked}')
+        for key in self.state_min_maxes:
+            # Save the normalization fields:
+            np.save(key, self.state_min_maxes[key])
+
+        return self.state
+
+    def get_entropy_state(self):
+
+        if self.use_image_as_state:
+            state = [np.array(self.state).flatten().transpose(0)]
+        else:
+            state = np.reshape(self.state, [1, self.internal_env.observation_space.shape[0]])
+        return state[0]
+
+    def camera_adjust(self):
+        pass
+
+    def render(self, mode, **kwargs):
+        return self.internal_env.render(mode)
+
+    def get_full_state(self, use_image=False) -> np.array:
+
+        if not use_image:
+            state = np.reshape(self.state, [1, self.internal_env.observation_space.shape[0]])
+        else:
+            state = super(FetchSanityTestCartPoleEnv, self).get_full_state(use_image)
+
+        if self.use_normalization:
+            state = self._normalize_states(state, 'cart_state_min_max.npy')
+
+        return state
+        # return state
+
+    def step(self, a):
+        """ UPDATE ACTIONS """
+        self.state, reward, done, info = self.internal_env.step(np.argmax(a))
+        state = self.get_full_state(self.use_image_as_state)
+        return state, reward, done, info
+
+class FetchSanityTestMountainCar(BaseFetchEnv, ABC):
+
+    def __init__(self):
+        """
+        Wraps the BaseFetchEnv but for the cart pole env.
+
+        Will be important for knowing that a certain model converges.
+        Needs to subclass most of the parent method calls since the robot will not exist
+        """
+        super().__init__()
+        import gym
+        self.internal_env = gym.make('MountainCar-v0')
+        self.action_space = np.zeros((self.internal_env.action_space.n, 1))
+        self.state = None
+
+    def create_single_player_scene(self, _p: BulletClient):
+        return None
+
+    def reset(self):
+        self.frame = 0
+        self.done = 0
+        self.reward = 0.0
+        self.elapsed_time = 0
+        self._accumulated_total_rewards.append(np.average(self._total_rewards))
+        self._total_rewards = [0.0]
+        self.state = self.internal_env.reset()
+        state = np.reshape(self.state, [1, self.internal_env.observation_space.shape[0]])
+
+        print(f'Setting Environment: Doing Reward Aug? {self._do_reward_balancing} Doing joint locking? '
+              f'{self.joints_are_locked}')
+        for key in self.state_min_maxes:
+            # Save the normalization fields:
+            np.save(key, self.state_min_maxes[key])
+
+        return self.state
+
+    def get_entropy_state(self):
+
+        if self.use_image_as_state:
+            state = [np.array(self.state).flatten().transpose(0)]
+        else:
+            state = np.reshape(self.state, [1, self.internal_env.observation_space.shape[0]])
+        return state[0]
+
+    def camera_adjust(self):
+        pass
+
+    def render(self, mode, **kwargs):
+        return self.internal_env.render(mode)
+
+    def get_full_state(self, use_image=False) -> np.array:
+
+        if not use_image:
+            state = np.reshape(self.state, [1, self.internal_env.observation_space.shape[0]])
+        else:
+            state = super(FetchSanityTestMountainCar, self).get_full_state(use_image)
+
+        if self.use_normalization:
+            state = self._normalize_states(state, 'mountain_car_min_max.npy')
+
+        return np.hstack((np.zeros(state.shape), state))
+        # return state
+
+    def step(self, a):
+        """ UPDATE ACTIONS """
+        self.state, reward, done, info = self.internal_env.step(np.argmax(a))
+        state = self.get_full_state(self.use_image_as_state)
+        return state, reward, done, info
 
 
 class FetchMoveBlockEnv(BaseFetchEnv, ABC):
