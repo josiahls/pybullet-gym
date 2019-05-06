@@ -151,33 +151,46 @@ register(
 )
 
 """ FETCH ENVS """
-register(
-	id='FetchPickKnifeAndCutTestEnv-v0',
-	entry_point='pybulletgym.envs.fetch_env.gym_locomotion_envs:FetchPickKnifeAndCutTestEnv',
-	max_episode_steps=1000
-)
-
-register(
-	id='FetchMoveBlockEnv-v0',
-	entry_point='pybulletgym.envs.fetch_env.gym_locomotion_envs:FetchMoveBlockEnv',
-	max_episode_steps=1000
-)
 
 register(
 	id='FetchCutBlockEnv-v1',
-	entry_point='pybulletgym.envs.fetch_env.gym_locomotion_envs:FetchCutBlockEnv_v1',
+	entry_point='pybulletgym.envs.fetch_env.gym_locomotion_envs:FetchCutBlockEnv',
+	max_episode_steps=100000
+)
+
+register(
+	id='FetchReach-v0',
+	entry_point='pybulletgym.envs.fetch_env.gym_locomotion_envs:FetchReach',
+	max_episode_steps=100000
+)
+
+register(
+	id='FetchPush-v0',
+	entry_point='pybulletgym.envs.fetch_env.gym_locomotion_envs:FetchPush',
+	max_episode_steps=100000
+)
+
+register(
+	id='FetchSlide-v0',
+	entry_point='pybulletgym.envs.fetch_env.gym_locomotion_envs:FetchSlide',
+	max_episode_steps=100000
+)
+
+register(
+	id='FetchPickAndPlace-v0',
+	entry_point='pybulletgym.envs.fetch_env.gym_locomotion_envs:FetchPickAndPlace',
 	max_episode_steps=100000
 )
 
 register(
 	id='FetchCutBlockNoKnifeTouchRewardEnv-v1',
-	entry_point='pybulletgym.envs.fetch_env.gym_locomotion_envs:FetchCutBlockNoKnifeTouchRewardEnv_v1',
+	entry_point='pybulletgym.envs.fetch_env.gym_locomotion_envs:FetchCutBlockNoKnifeTouchRewardEnv',
 	max_episode_steps=100000
 )
 
 register(
 	id='FetchCutBlockRandomEnv-v1',
-	entry_point='pybulletgym.envs.fetch_env.gym_locomotion_envs:FetchCutBlockEnvRandom_v1',
+	entry_point='pybulletgym.envs.fetch_env.gym_locomotion_envs:FetchCutBlockEnvRandom',
 	max_episode_steps=100000
 )
 

@@ -12,7 +12,7 @@ from pybulletgym.envs.mujoco.robot_bases import XmlBasedRobot, MJCFBasedRobot
 
 class FetchURDF(URDFBasedRobot):
 
-    def __init__(self, power=2.9):
+    def __init__(self, power=0.2):
         URDFBasedRobot.__init__(self, "fetch/fetch_description/robots/fetch.urdf", "base_link", action_dim=25,
                                 obs_dim=70, self_collision=True)
         self.power = power

@@ -144,20 +144,26 @@ class TargetSceneObject(SceneObject):
     def __init__(self, bullet_client: BulletClient, filename: str = None, position: list = None,
                  orientation: list = None,
                  flags=0, removable=False, reloadable=True, create_body_params=None, create_collision_params=None,
-                 create_visual_shape_params=None):
+                 create_visual_shape_params=None, randomize=False, random_range=None):
         """
-        A slicable object for now is a single mesh, zero link object that can break into smaller objects
-        via being removed from the world, and being replaced by smaller children.
 
-        :param bullet_client:
-        :param filename:
-        :param position:
-        :param orientation:
-        :param flags:
-        :param removable:
-        :param
-        reloadable:
+        Args:
+            bullet_client:
+            filename:
+            position:
+            orientation:
+            flags:
+            removable:
+            reloadable:
+            create_body_params:
+            create_collision_params:
+            create_visual_shape_params:
+            randomize: True or False if we want to randomize the target position
+            random_range: Should be a tuple in the format Tuple((x_max, y_max, z_max), (x_min, y_min, z_min)) or as
+                          a single Tuple(x, y, z) that does randomized half extends from the origin
         """
+        self.random_range = random_range
+        self.randomize = randomize
         self._p = bullet_client
         self.filename = filename
         self.objects_to_compare = []
@@ -182,6 +188,93 @@ class TargetSceneObject(SceneObject):
             self.removed = False
 
         super().__init__(bullet_client, filename, position, orientation, flags, removable, reloadable, 1)
+
+    def reload(self):
+        super(TargetSceneObject, self).reload()
+        # Target Objects have the option to randomize their positions
+        if self.randomize and self.random_range is not None:
+            pos = self.params['basePosition']
+            self.reset_position((
+                np.random.uniform(pos[0] - self.random_range[0], pos[0] + self.random_range[0]),
+                np.random.uniform(pos[1] - self.random_range[1], pos[1] + self.random_range[1]),
+                np.random.uniform(pos[2] - self.random_range[2], pos[2] + self.random_range[2])
+            ))
+
+    def set_objects_to_compare(self, objects_to_compare):
+        self.objects_to_compare = objects_to_compare
+
+    def _get_internal_state(self, scene):
+        """
+        Returns the sum distances of the target against non-target objects
+
+        :param scene:
+        :return:
+        """
+        objects_to_compare = [o for o in scene.scene_objects if type(o) is not TargetSceneObject]
+
+        return sum([np.linalg.norm(self.get_position() - other_object.get_position())
+                    for other_object in objects_to_compare])
+
+
+class ProjectileSceneObject(SceneObject):
+    def __init__(self, bullet_client: BulletClient, filename: str = None, position: list = None,
+                 orientation: list = None,
+                 flags=0, removable=False, reloadable=True, create_body_params=None, create_collision_params=None,
+                 create_visual_shape_params=None, randomize=False, random_range=None):
+        """
+
+        Args:
+            bullet_client:
+            filename:
+            position:
+            orientation:
+            flags:
+            removable:
+            reloadable:
+            create_body_params:
+            create_collision_params:
+            create_visual_shape_params:
+            randomize: True or False if we want to randomize the target position
+            random_range: Should be a tuple in the format Tuple((x_max, y_max, z_max), (x_min, y_min, z_min)) or as
+                          a single Tuple(x, y, z) that does randomized half extends from the origin
+        """
+        self.random_range = random_range
+        self.randomize = randomize
+        self._p = bullet_client
+        self.filename = filename
+        self.objects_to_compare = []
+        if filename is None:
+            create_visual_shape_params = {_: create_visual_shape_params[_] for _ in create_visual_shape_params if
+                                          create_visual_shape_params[_] is not None}
+            create_collision_params = {_: create_collision_params[_] for _ in create_collision_params if
+                                       create_collision_params[_] is not None}
+            create_body_params = {_: create_body_params[_] for _ in create_body_params if
+                                  create_body_params[_] is not None}
+
+            self.create_visual_shape_params = create_visual_shape_params
+            self.create_collision_params = create_collision_params
+            self.create_body_params = create_body_params
+
+            self.removable = True
+            self.reloadable = True
+            self.removed = True
+            self.reload()
+            self.removable = removable
+            self.reloadable = reloadable
+            self.removed = False
+
+        super().__init__(bullet_client, filename, position, orientation, flags, removable, reloadable, 1)
+
+    def reload(self):
+        super(ProjectileSceneObject, self).reload()
+        # Target Objects have the option to randomize their positions
+        if self.randomize and self.random_range is not None:
+            pos = self.params['basePosition']
+            self.reset_position((
+                np.random.uniform(pos[0] - self.random_range[0], pos[0] + self.random_range[0]),
+                np.random.uniform(pos[1] - self.random_range[1], pos[1] + self.random_range[1]),
+                np.random.uniform(pos[2] - self.random_range[2], pos[2] + self.random_range[2])
+            ))
 
     def set_objects_to_compare(self, objects_to_compare):
         self.objects_to_compare = objects_to_compare

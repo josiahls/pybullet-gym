@@ -7,7 +7,8 @@ from typing import List
 import numpy as np
 
 from .scene_bases import Scene
-from .scene_object_bases import SceneObject, SlicingSceneObject, SlicableSceneObject, TargetSceneObject
+from .scene_object_bases import SceneObject, SlicingSceneObject, SlicableSceneObject, TargetSceneObject, \
+    ProjectileSceneObject
 
 currentdir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
 parentdir = os.path.dirname(currentdir)
@@ -48,8 +49,10 @@ class SceneFetch(Scene):
                 if not scene_object.reloadable:
                     self.scene_objects.remove(scene_object)
 
-    def dynamic_object_load(self, bullet_client: pybullet):
-        pass
+    def dynamic_object_reset(self, bullet_client: pybullet):
+        # Load scene objects that require interaction
+        for scene_object in self.scene_objects:
+            scene_object.reload()
 
     def calc_state(self):
         """
@@ -73,11 +76,46 @@ class SceneFetch(Scene):
             object_states.append(scene_object.calc_state(self))
         return object_states
 
+    def get_goal(self):
+        pass
+
+    def get_current_state_goal(self):
+        pass
+
+
+class ReachScene(SceneFetch):
+    def episode_restart(self, bullet_client: pybullet):
+        self._p = bullet_client
+        Scene.episode_restart(self, bullet_client)
+        if self.sceneLoaded == 0:
+            self.sceneLoaded = 1
+            # Load the table
+            filename = os.path.join(os.path.dirname(__file__), "..", "assets", "things", "cubes",
+                                    "cube_table.urdf")
+            self._p.loadURDF(filename, [0.7, 0, 0.23], [0, 0, 90, 90])
+            # Load the plane
+            filename = os.path.join(os.path.dirname(__file__), "..", "assets", "things", "plane",
+                                    "plain_plane.urdf")
+            self._p.loadURDF(filename)
+
+            # Load the cube
+            filename = os.path.join(os.path.dirname(__file__), "..", "assets", "things", "spheres",
+                                    "sphere_small_target.urdf")
+            self.scene_objects.append(TargetSceneObject(self._p, filename, [.75, 0, 0.60], removable=False,
+                                                        randomize=True, random_range=(.25, .25, .12)))
+
+    def get_goal(self):
+        return [scene_object.get_position() for scene_object in self.scene_objects
+                if type(scene_object) is TargetSceneObject]
+
 
 class PickAndPlaceScene(SceneFetch):
     """
     The goal of this scene is to set up a scene for picking up and moving
     an object to another location.
+
+    Some key points here is that the Projectile object has friction, and the table is small enough for the
+    robot to reach anywhere
 
     """
 
@@ -86,25 +124,71 @@ class PickAndPlaceScene(SceneFetch):
         Scene.episode_restart(self, bullet_client)
         if self.sceneLoaded == 0:
             self.sceneLoaded = 1
-
             # Load the table
-            filename = os.path.join(os.path.dirname(__file__), "..", "assets", "things", "table",
-                                    "table.urdf")
-            self._p.loadURDF(filename, [1, 0, 0], [0, 0, 90, 90])
+            filename = os.path.join(os.path.dirname(__file__), "..", "assets", "things", "cubes",
+                                    "cube_table.urdf")
+            self._p.loadURDF(filename, [0.7, 0, 0.23], [0, 0, 90, 90])
             # Load the plane
             filename = os.path.join(os.path.dirname(__file__), "..", "assets", "things", "plane",
-                                    "plane.urdf")
+                                    "plain_plane.urdf")
             self._p.loadURDF(filename)
 
-            # Load the cube
-            filename = os.path.join(os.path.dirname(__file__), "..", "assets", "things", "cubes",
-                                    "cube_target_no_collision.urdf")
-            self._p.loadURDF(filename, [1, -0.3, 0.75])
+            # Load the target
+            filename = os.path.join(os.path.dirname(__file__), "..", "assets", "things", "spheres",
+                                    "sphere_small_target.urdf")
+            self.scene_objects.append(TargetSceneObject(self._p, filename, [.75, 0, 0.50], removable=False,
+                                                        randomize=True, random_range=(.25, .25, .06)))
 
-            # Load the cube
+            # Load the cube (using the Projectile Class)
             filename = os.path.join(os.path.dirname(__file__), "..", "assets", "things", "cubes",
-                                    "cube_small.urdf")
-            self._p.loadURDF(filename, [1, 0.3, 0.65])
+                                    "cube_projectile.urdf")
+            self.scene_objects.append(ProjectileSceneObject(self._p, filename, [.75, 0, 0.50], removable=False,
+                                                            randomize=True, random_range=(.25, .25, .06)))
+
+    def get_goal(self):
+        return [scene_object.get_position() for scene_object in self.scene_objects
+                if type(scene_object) is TargetSceneObject]
+
+
+class SlideScene(SceneFetch):
+    """
+    The goal of this scene is to set up a scene for picking up and moving
+    an object to another location.
+
+    Some key points here is that the Projectile object has friction, and the table is small enough for the
+    robot to reach anywhere
+
+    """
+
+    def episode_restart(self, bullet_client: pybullet):
+        self._p = bullet_client
+        Scene.episode_restart(self, bullet_client)
+        if self.sceneLoaded == 0:
+            self.sceneLoaded = 1
+            # Load the table
+            filename = os.path.join(os.path.dirname(__file__), "..", "assets", "things", "cubes",
+                                    "cube_table_long.urdf")
+            self._p.loadURDF(filename, [1, 0, 0.23], [0, 0, 90, 90])
+            # Load the plane
+            filename = os.path.join(os.path.dirname(__file__), "..", "assets", "things", "plane",
+                                    "plain_plane.urdf")
+            self._p.loadURDF(filename, [0.5, 0, 0])
+
+            # Load the target
+            filename = os.path.join(os.path.dirname(__file__), "..", "assets", "things", "spheres",
+                                    "sphere_small_target.urdf")
+            self.scene_objects.append(TargetSceneObject(self._p, filename, [1.2, 0, 0.49], removable=False,
+                                                        randomize=True, random_range=(.25, .25, 0)))
+
+            # Load the cube (using the Projectile Class)
+            filename = os.path.join(os.path.dirname(__file__), "..", "assets", "things", "cubes",
+                                    "cube_no_friction_projectile.urdf")
+            self.scene_objects.append(ProjectileSceneObject(self._p, filename, [.75, 0, 0.50], removable=False,
+                                                            randomize=True, random_range=(.22, .25, 0)))
+
+    def get_goal(self):
+        return [scene_object.get_position() for scene_object in self.scene_objects
+                if type(scene_object) is TargetSceneObject]
 
 
 class PickKnifeAndCutTestScene(SceneFetch):
@@ -212,7 +296,7 @@ class PickAndMoveScene(SceneFetch):
                                     "plane.urdf")
             self._p.loadURDF(filename)
 
-    def dynamic_object_load(self, bullet_client: pybullet):
+    def dynamic_object_reset(self, bullet_client: pybullet):
         """
 
             As a note, the remove order does not matter, the reload does matter.
@@ -292,11 +376,11 @@ class KnifeCutScene(SceneFetch):
         self.sceneLoaded = 0
         self.scene_objects = []  # type: List[SceneObject]
         self.object_features = {'pos_x': 0, 'pos_y': 0,
-                        'pos_z': 0,
-                        'or_x': 0,
-                        'or_y': 0,
-                        'or_z': 0, 'width': 0,
-                        'height': 0, 'length': 0, 'radius': 0, 'obj_type': 0, 'obj_internal_state': 0}
+                                'pos_z': 0,
+                                'or_x': 0,
+                                'or_y': 0,
+                                'or_z': 0, 'width': 0,
+                                'height': 0, 'length': 0, 'radius': 0, 'obj_type': 0, 'obj_internal_state': 0}
 
     def episode_restart(self, bullet_client: pybullet):
         self._p = bullet_client
@@ -323,7 +407,7 @@ class KnifeCutScene(SceneFetch):
                                                                pybullet.URDF_USE_MATERIAL_TRANSPARANCY_FROM_MTL,
                                                          slicing_parts=['blade']))
 
-    def dynamic_object_load(self, bullet_client: pybullet):
+    def dynamic_object_reset(self, bullet_client: pybullet):
         """
 
             As a note, the remove order does not matter, the reload does matter.

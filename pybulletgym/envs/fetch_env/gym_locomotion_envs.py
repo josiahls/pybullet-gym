@@ -8,10 +8,10 @@ from pybullet_envs.bullet.bullet_client import BulletClient
 
 from .env_bases import BaseBulletEnv
 from .robot_locomotors import FetchURDF
-from .scene_manipulators import PickKnifeAndCutTestScene, PickAndMoveScene, KnifeCutScene, SceneFetch
-from .scene_object_bases import Features
+from .scene_manipulators import PickKnifeAndCutTestScene, PickAndMoveScene, KnifeCutScene, SceneFetch, ReachScene, \
+    PickAndPlaceScene, SlideScene
+from .scene_object_bases import Features, ProjectileSceneObject
 import os
-
 """
 Notes, the joints are labeled as follows:
 '0 r_wheel_joint'
@@ -42,60 +42,8 @@ Notes, the joints are labeled as follows:
 """
 
 
-def d_custom_reward_throw_bone(func):
-    """
-    Depending on the environment. We can look at the present rewards. If the robot has been constantly failing,
-    we can optionally make rewards more rewarding. If they are too rewarding, then we can reduce the reward output.
-
-    Args:
-        func:
-
-    Returns:
-
-    """
-
-    def func_custom_reward_wrapper(self):
-        # Get the custom reward
-        custom_reward = func(self)
-
-        # Is there an imbalance?
-        neg_count = np.sum(np.array(self._accumulated_total_rewards) < 0, axis=0)
-        pos_count = np.sum(np.array(self._accumulated_total_rewards) > 0, axis=0)
-
-        # Don't start balancing until after 10 accumulated rewards
-        if neg_count + pos_count < 10 and not self._do_reward_balancing:
-            return custom_reward
-
-        should_balance_neg = neg_count / len(self._accumulated_total_rewards) + \
-                             self._percent_margin < self._percent_failure_allowable
-        should_balance_pos = pos_count / len(self._accumulated_total_rewards) + \
-                             self._percent_margin < self._percent_success_allowable
-
-        # Augment the reward with the +1 bonus
-        if should_balance_pos and custom_reward > 0:
-            custom_reward = (custom_reward * self._pos_bone)
-            print(f'Augmenting with pos bonus {self._pos_bone}')
-            if self._pos_bone < self._bone_max:
-                self._pos_bone += self._bone_gamma
-        if should_balance_neg and custom_reward < 0:
-            custom_reward = (custom_reward * self._neg_bone)
-            print(f'Augmenting with neg bonus {self._neg_bone}')
-            if self._neg_bone < self._bone_max:
-                self._neg_bone += self._bone_gamma
-
-        # Decrement the bonus by gamma
-        self._pos_bone = self._pos_bone - (
-                self._bone_gamma ** 2) if self._pos_bone > self._pos_bone_min else self._pos_bone
-        self._neg_bone = self._neg_bone - (
-                self._bone_gamma ** 2) if self._neg_bone > self._pos_bone_min else self._neg_bone
-
-        return custom_reward
-
-    return func_custom_reward_wrapper
-
-
 class BaseFetchEnv(BaseBulletEnv, ABC):
-    def __init__(self, is_sanity_test=False):
+    def __init__(self, is_sanity_test=False, distance_threshold = 0, reward_type='default', power=0.2):
         """
         BaseFetchEnv is concerned with the following:
         - Fetch robot complexity
@@ -107,13 +55,16 @@ class BaseFetchEnv(BaseBulletEnv, ABC):
         environment creation and testing. Most of all, reduce threat of
         bugs crashing an env training 50% of the way through.
         """
+        self.power = power
         if not is_sanity_test:
-            self.robot = FetchURDF()
+            self.robot = FetchURDF(self.power)
             BaseBulletEnv.__init__(self, self.robot)
 
         self.joints_at_limit_cost = -1.
         self.scene = None
         self.potential = 0
+        self.reward_type = reward_type
+        self.distance_threshold = distance_threshold
         self.rewards = []
 
         self.joints_are_locked = False
@@ -137,7 +88,7 @@ class BaseFetchEnv(BaseBulletEnv, ABC):
         self.done = 0
         self.reward = 0.0
         self.elapsed_time = 0
-        self.elapsed_time_cost = 0.0
+        self.elapsed_time_cost = 0.01
         self.max_step_length = 100
         self.min_step_length = 20
         self.max_state_space_object_size = 3
@@ -146,7 +97,7 @@ class BaseFetchEnv(BaseBulletEnv, ABC):
         self._cam_yaw = 90
         self._p = None
 
-        self.use_normalization = False
+        self.use_normalization = True
         self.state_min_maxes = {}  # type: dict
 
     def reset(self):
@@ -206,13 +157,13 @@ class BaseFetchEnv(BaseBulletEnv, ABC):
             self.stateId = self._p.saveState()
 
         # Load dynamic objects
-        self.scene.dynamic_object_load(self._p)
+        self.scene.dynamic_object_reset(self._p)
 
         # Update the robot init position if available
-        while not self.init_robot_pose():
-            pass
+        # while not self.init_robot_pose():
+        #     pass
 
-        return s
+        return self.get_full_state()
 
     def create_single_player_scene(self, _p: BulletClient):
         return SceneFetch(_p, gravity=9.8, timestep=0.0165 / 4, frame_skip=4)
@@ -280,7 +231,6 @@ class BaseFetchEnv(BaseBulletEnv, ABC):
         # Normalize the states
         state = (state - self.state_min_maxes[filename][1]) / \
                     (self.state_min_maxes[filename][0] - self.state_min_maxes[filename][1] + 0.001)
-        print(f'Current State {state}')
         return state
 
     def step(self, a):
@@ -303,6 +253,7 @@ class BaseFetchEnv(BaseBulletEnv, ABC):
 
         # Punish higher amounts of time
         self.elapsed_time += 1
+        time_cost = self.elapsed_time_cost if self.elapsed_time > self.min_step_length else 0
 
         joints_at_limit_cost = float(self.joints_at_limit_cost * self.robot.joints_at_limit)
         joints_at_speed_limit_cost = float(self.joints_at_limit_cost * self.robot.joints_at_speed_limit)
@@ -322,7 +273,7 @@ class BaseFetchEnv(BaseBulletEnv, ABC):
 
         self.rewards = [
             alive,
-            -1 * self.elapsed_time * self.elapsed_time_cost,
+            -1 * self.elapsed_time * time_cost,
             joints_at_limit_cost,
             joints_at_speed_limit_cost,
             custom_reward,
@@ -339,7 +290,7 @@ class BaseFetchEnv(BaseBulletEnv, ABC):
             print("~INF~", self.state)
             done = True
         if done:
-            print(f'Done because: state[0] is {state[0][0]} and the initial z is: {self.robot.initial_z} and the rpy '
+            print(f'Done because: state[0] is {self.state[0][0]} and the initial z is: {self.robot.initial_z} and the rpy '
                   f'rpy is {self.robot.body_rpy} rxy is {self.robot.body_xyz}')
         if not done and self.elapsed_time > self.max_step_length:
             done = True
@@ -356,8 +307,7 @@ class BaseFetchEnv(BaseBulletEnv, ABC):
     def get_entropy_state(self):
         return self.robot.gripper_link.get_position()
 
-    @d_custom_reward_throw_bone
-    def get_custom_reward(self):
+    def get_custom_reward(self, achieved_goal=None, goal=None):
         return 0
 
     def init_robot_pose(self) -> bool:
@@ -372,26 +322,293 @@ class BaseFetchEnv(BaseBulletEnv, ABC):
         """
         pass
 
+    def _goal_distance(self, goal_a, goal_b):
+        assert goal_a.shape == goal_b.shape
+        return np.linalg.norm(goal_a - goal_b, axis=-1)
 
-class FetchPickKnifeAndCutTestEnv(BaseFetchEnv, ABC):
+    def get_achieved_goal(self):
+        pass
+
+
+class FetchReach(BaseFetchEnv, ABC):
+    def __init__(self, is_sanity_test=False, distance_threshold = 0, reward_type='default', power=0.2):
+        super().__init__(is_sanity_test, distance_threshold, reward_type, power)
 
     def create_single_player_scene(self, _p: BulletClient):
-        self.scene = PickKnifeAndCutTestScene(_p, gravity=9.8, timestep=0.0165 / 4, frame_skip=4)
+        self.scene = ReachScene(_p, gravity=9.8, timestep=0.0165 / 4, frame_skip=4)
         return self.scene
+
+    def get_custom_reward(self, achieved_goal=None, goal=None):
+        if achieved_goal is None:
+            achieved_goal = self.get_achieved_goal()
+
+        if goal is None:
+            goal = self.scene.get_goal()[0]
+        
+        assert achieved_goal is not None, 'The achieved_goal is None. Needs to be an np.array'
+        assert goal is not None, 'The goal is None. Needs to be an np.array'
+
+        d = self._goal_distance(achieved_goal, goal)
+        if self.reward_type == 'sparse':
+            return -(d > self.distance_threshold).astype(np.float32)
+        else:
+            return -d
+
+    def execute_joint_lock(self, should_lock=None):
+        if should_lock is not None and type(should_lock) is bool:
+            self.joints_are_locked = should_lock
+        if self.joints_are_locked:
+            self.robot.lock_joints = [True] * self.action_space.shape[0]
+            self.robot.lock_joints[10] = False  # Unlock 'shoulder_pan_joint
+            self.robot.lock_joints[11] = False  # Unlock 'shoulder_lift_joint'
+            # self.robot.lock_joints[12] = False  # Unlock 'upperarm_roll_joint'
+            self.robot.lock_joints[13] = False  # Unlock 'elbow_flex_joint'
+            # self.robot.lock_joints[14] = False  # Unlock 'forearm_roll_joint'
+            self.robot.lock_joints[15] = False  # Unlock 'wrist_flex_joint'
+            # self.robot.lock_joints[16] = False  # Unlock 'wrist_roll_joint'
+            self.robot.lock_joints[17] = False  # Unlock 'gripper_axis'
+            self.robot.lock_joints[18] = False  # Unlock 'r_gripper_finger_joint'
+            self.robot.lock_joints[19] = False  # Unlock 'l_gripper_finger_joint'
+        else:
+            self.robot.lock_joints = [False] * self.action_space.shape[0]
+
+        self.joints_are_locked = not self.joints_are_locked
+
+    def get_achieved_goal(self):
+        return np.average((self.robot.l_gripper_finger_link.get_position(),
+                           self.robot.r_gripper_finger_link.get_position()), axis=0)
+
+
+class FetchPickAndPlace(BaseFetchEnv, ABC):
+    def __init__(self, is_sanity_test=False, distance_threshold=0, reward_type='default', power=0.2):
+        super().__init__(is_sanity_test, distance_threshold, reward_type, power)
+
+    def create_single_player_scene(self, _p: BulletClient):
+        self.scene = PickAndPlaceScene(_p, gravity=9.8, timestep=0.0165 / 4, frame_skip=4)
+        return self.scene
+
+    def get_custom_reward(self, achieved_goal=None, goal=None):
+        if achieved_goal is None:
+            achieved_goal = self.get_achieved_goal()
+
+        if goal is None:
+            goal = self.scene.get_goal()[0]
+
+        assert achieved_goal is not None, 'The achieved_goal is None. Needs to be an np.array'
+        assert goal is not None, 'The goal is None. Needs to be an np.array'
+
+        d = self._goal_distance(achieved_goal, goal)
+        if self.reward_type == 'sparse':
+            return -(d > self.distance_threshold).astype(np.float32)
+        else:
+            return -d
+
+    def get_achieved_goal(self):
+        return np.average(tuple([scene_object.get_position() for scene_object in self.scene.scene_objects
+                                 if type(scene_object) is ProjectileSceneObject]), axis=0)
+
+    def execute_joint_lock(self, should_lock=None):
+        if should_lock is not None and type(should_lock) is bool:
+            self.joints_are_locked = should_lock
+        if self.joints_are_locked:
+            self.robot.lock_joints = [True] * self.action_space.shape[0]
+            self.robot.lock_joints[10] = False  # Unlock 'shoulder_pan_joint
+            self.robot.lock_joints[11] = False  # Unlock 'shoulder_lift_joint'
+            # self.robot.lock_joints[12] = False  # Unlock 'upperarm_roll_joint'
+            self.robot.lock_joints[13] = False  # Unlock 'elbow_flex_joint'
+            # self.robot.lock_joints[14] = False  # Unlock 'forearm_roll_joint'
+            self.robot.lock_joints[15] = False  # Unlock 'wrist_flex_joint'
+            # self.robot.lock_joints[16] = False  # Unlock 'wrist_roll_joint'
+            self.robot.lock_joints[17] = False  # Unlock 'gripper_axis'
+            self.robot.lock_joints[18] = False  # Unlock 'r_gripper_finger_joint'
+            self.robot.lock_joints[19] = False  # Unlock 'l_gripper_finger_joint'
+        else:
+            self.robot.lock_joints = [False] * self.action_space.shape[0]
+
+        self.joints_are_locked = not self.joints_are_locked
+
+
+class FetchPush(BaseFetchEnv, ABC):
+    def __init__(self, is_sanity_test=False, distance_threshold=0, reward_type='default', power=0.2):
+        super().__init__(is_sanity_test, distance_threshold, reward_type, power)
+
+    def create_single_player_scene(self, _p: BulletClient):
+        self.scene = PickAndPlaceScene(_p, gravity=9.8, timestep=0.0165 / 4, frame_skip=4)
+        return self.scene
+
+    def get_custom_reward(self, achieved_goal=None, goal=None):
+        if achieved_goal is None:
+            achieved_goal = self.get_achieved_goal()
+
+        if goal is None:
+            goal = self.scene.get_goal()[0]
+
+        assert achieved_goal is not None, 'The achieved_goal is None. Needs to be an np.array'
+        assert goal is not None, 'The goal is None. Needs to be an np.array'
+
+        d = self._goal_distance(achieved_goal, goal)
+        if self.reward_type == 'sparse':
+            return -(d > self.distance_threshold).astype(np.float32)
+        else:
+            return -d
+
+    def get_achieved_goal(self):
+        return np.average(tuple([scene_object.get_position() for scene_object in self.scene.scene_objects
+                                 if type(scene_object) is ProjectileSceneObject]), axis=0)
+
+    def execute_joint_lock(self, should_lock=None):
+        if should_lock is not None and type(should_lock) is bool:
+            self.joints_are_locked = should_lock
+        if self.joints_are_locked:
+            self.robot.lock_joints = [True] * self.action_space.shape[0]
+            self.robot.lock_joints[10] = False  # Unlock 'shoulder_pan_joint
+            self.robot.lock_joints[11] = False  # Unlock 'shoulder_lift_joint'
+            # self.robot.lock_joints[12] = False  # Unlock 'upperarm_roll_joint'
+            self.robot.lock_joints[13] = False  # Unlock 'elbow_flex_joint'
+            # self.robot.lock_joints[14] = False  # Unlock 'forearm_roll_joint'
+            self.robot.lock_joints[15] = False  # Unlock 'wrist_flex_joint'
+            # self.robot.lock_joints[16] = False  # Unlock 'wrist_roll_joint'
+            self.robot.lock_joints[17] = False  # Unlock 'gripper_axis'
+            # self.robot.lock_joints[18] = False  # Unlock 'r_gripper_finger_joint'
+            # self.robot.lock_joints[19] = False  # Unlock 'l_gripper_finger_joint'
+        else:
+            self.robot.lock_joints = [False] * self.action_space.shape[0]
+
+        self.joints_are_locked = not self.joints_are_locked
+
+
+class FetchSlide(BaseFetchEnv, ABC):
+    def __init__(self, is_sanity_test=False, distance_threshold=0, reward_type='default', power=0.2):
+        super().__init__(is_sanity_test, distance_threshold, reward_type, power)
+
+    def create_single_player_scene(self, _p: BulletClient):
+        self.scene = SlideScene(_p, gravity=9.8, timestep=0.0165 / 4, frame_skip=4)
+        return self.scene
+
+    def get_custom_reward(self, achieved_goal=None, goal=None):
+        if achieved_goal is None:
+            achieved_goal = self.get_achieved_goal()
+
+        if goal is None:
+            goal = self.scene.get_goal()[0]
+
+        assert achieved_goal is not None, 'The achieved_goal is None. Needs to be an np.array'
+        assert goal is not None, 'The goal is None. Needs to be an np.array'
+
+        d = self._goal_distance(achieved_goal, goal)
+        if self.reward_type == 'sparse':
+            return -(d > self.distance_threshold).astype(np.float32)
+        else:
+            return -d
+
+    def get_achieved_goal(self):
+        return np.average(tuple([scene_object.get_position() for scene_object in self.scene.scene_objects
+                                 if type(scene_object) is ProjectileSceneObject]), axis=0)
+
+    def execute_joint_lock(self, should_lock=None):
+        if should_lock is not None and type(should_lock) is bool:
+            self.joints_are_locked = should_lock
+        if self.joints_are_locked:
+            self.robot.lock_joints = [True] * self.action_space.shape[0]
+            self.robot.lock_joints[10] = False  # Unlock 'shoulder_pan_joint
+            self.robot.lock_joints[11] = False  # Unlock 'shoulder_lift_joint'
+            # self.robot.lock_joints[12] = False  # Unlock 'upperarm_roll_joint'
+            self.robot.lock_joints[13] = False  # Unlock 'elbow_flex_joint'
+            # self.robot.lock_joints[14] = False  # Unlock 'forearm_roll_joint'
+            self.robot.lock_joints[15] = False  # Unlock 'wrist_flex_joint'
+            # self.robot.lock_joints[16] = False  # Unlock 'wrist_roll_joint'
+            self.robot.lock_joints[17] = False  # Unlock 'gripper_axis'
+            # self.robot.lock_joints[18] = False  # Unlock 'r_gripper_finger_joint'
+            # self.robot.lock_joints[19] = False  # Unlock 'l_gripper_finger_joint'
+        else:
+            self.robot.lock_joints = [False] * self.action_space.shape[0]
+
+        self.joints_are_locked = not self.joints_are_locked
 
 
 class FetchSanityTestCartPoleEnv(BaseFetchEnv, ABC):
 
-    def __init__(self):
+    def __init__(self, is_sanity_test=False, distance_threshold = 0, reward_type='default', power=0.2):
+        super().__init__(is_sanity_test, distance_threshold, reward_type, power)
         """
         Wraps the BaseFetchEnv but for the cart pole env.
 
         Will be important for knowing that a certain model converges.
         Needs to subclass most of the parent method calls since the robot will not exist
         """
-        super().__init__()
         import gym
         self.internal_env = gym.make('CartPole-v0')
+        self.action_space = np.zeros((self.internal_env.action_space.n, 1))
+        self.state = None
+
+    def create_single_player_scene(self, _p: BulletClient):
+        return None
+
+    def reset(self):
+        self.frame = 0
+        self.done = 0
+        self.reward = 0.0
+        self.elapsed_time = 0
+        self._accumulated_total_rewards.append(np.average(self._total_rewards))
+        self._total_rewards = [0.0]
+        self.state = self.internal_env.reset()
+        self.state = self.get_full_state(self.use_image_as_state)
+
+        print(f'Setting Environment: Doing Reward Aug? {self._do_reward_balancing} Doing joint locking? '
+              f'{self.joints_are_locked}')
+        for key in self.state_min_maxes:
+            # Save the normalization fields:
+            np.save(key, self.state_min_maxes[key])
+
+        return self.state
+
+    def get_entropy_state(self):
+
+        if self.use_image_as_state:
+            state = [np.array(self.state).flatten().transpose(0)]
+        else:
+            state = np.reshape(self.state, [1, self.internal_env.observation_space.shape[0]])
+        return state[0]
+
+    def camera_adjust(self):
+        pass
+
+    def render(self, mode, **kwargs):
+        return self.internal_env.render(mode)
+
+    def get_full_state(self, use_image=False) -> np.array:
+
+        if not use_image:
+            state = np.reshape(self.state, [1, self.internal_env.observation_space.shape[0]])
+        else:
+            state = super(FetchSanityTestCartPoleEnv, self).get_full_state(use_image)
+
+        if self.use_normalization:
+            state = self._normalize_states(state, 'cart_state_min_max.npy')
+
+        print(f'Current State {np.array([np.array([state[0][3]])])}')
+        # return np.array(state)
+        return state
+
+    def step(self, a):
+        """ UPDATE ACTIONS """
+        self.state, reward, done, info = self.internal_env.step(np.argmax(a))
+        state = self.get_full_state(self.use_image_as_state)
+        return state, reward, done, info
+
+
+class FetchSanityTestMountainCar(BaseFetchEnv, ABC):
+
+    def __init__(self, is_sanity_test=False, distance_threshold = 0, reward_type='default', power=0.2):
+        super().__init__(is_sanity_test, distance_threshold, reward_type, power)
+        """
+        Wraps the BaseFetchEnv but for the cart pole env.
+
+        Will be important for knowing that a certain model converges.
+        Needs to subclass most of the parent method calls since the robot will not exist
+        """
+        import gym
+        self.internal_env = gym.make('MountainCar-v0')
         self.action_space = np.zeros((self.internal_env.action_space.n, 1))
         self.state = None
 
@@ -435,82 +652,13 @@ class FetchSanityTestCartPoleEnv(BaseFetchEnv, ABC):
         if not use_image:
             state = np.reshape(self.state, [1, self.internal_env.observation_space.shape[0]])
         else:
-            state = super(FetchSanityTestCartPoleEnv, self).get_full_state(use_image)
-
-        if self.use_normalization:
-            state = self._normalize_states(state, 'cart_state_min_max.npy')
-
-        return state
-        # return state
-
-    def step(self, a):
-        """ UPDATE ACTIONS """
-        self.state, reward, done, info = self.internal_env.step(np.argmax(a))
-        state = self.get_full_state(self.use_image_as_state)
-        return state, reward, done, info
-
-class FetchSanityTestMountainCar(BaseFetchEnv, ABC):
-
-    def __init__(self):
-        """
-        Wraps the BaseFetchEnv but for the cart pole env.
-
-        Will be important for knowing that a certain model converges.
-        Needs to subclass most of the parent method calls since the robot will not exist
-        """
-        super().__init__()
-        import gym
-        self.internal_env = gym.make('MountainCar-v0')
-        self.action_space = np.zeros((self.internal_env.action_space.n, 1))
-        self.state = None
-
-    def create_single_player_scene(self, _p: BulletClient):
-        return None
-
-    def reset(self):
-        self.frame = 0
-        self.done = 0
-        self.reward = 0.0
-        self.elapsed_time = 0
-        self._accumulated_total_rewards.append(np.average(self._total_rewards))
-        self._total_rewards = [0.0]
-        self.state = self.internal_env.reset()
-        state = np.reshape(self.state, [1, self.internal_env.observation_space.shape[0]])
-
-        print(f'Setting Environment: Doing Reward Aug? {self._do_reward_balancing} Doing joint locking? '
-              f'{self.joints_are_locked}')
-        for key in self.state_min_maxes:
-            # Save the normalization fields:
-            np.save(key, self.state_min_maxes[key])
-
-        return self.state
-
-    def get_entropy_state(self):
-
-        if self.use_image_as_state:
-            state = [np.array(self.state).flatten().transpose(0)]
-        else:
-            state = np.reshape(self.state, [1, self.internal_env.observation_space.shape[0]])
-        return state[0]
-
-    def camera_adjust(self):
-        pass
-
-    def render(self, mode, **kwargs):
-        return self.internal_env.render(mode)
-
-    def get_full_state(self, use_image=False) -> np.array:
-
-        if not use_image:
-            state = np.reshape(self.state, [1, self.internal_env.observation_space.shape[0]])
-        else:
             state = super(FetchSanityTestMountainCar, self).get_full_state(use_image)
 
         if self.use_normalization:
             state = self._normalize_states(state, 'mountain_car_min_max.npy')
 
-        return np.hstack((np.zeros(state.shape), state))
-        # return state
+        # return np.hstack((np.zeros(state.shape), state))
+        return state
 
     def step(self, a):
         """ UPDATE ACTIONS """
@@ -521,8 +669,8 @@ class FetchSanityTestMountainCar(BaseFetchEnv, ABC):
 
 class FetchMoveBlockEnv(BaseFetchEnv, ABC):
 
-    def __init__(self):
-        super().__init__()
+    def __init__(self, is_sanity_test=False, distance_threshold = 0, reward_type='default', power=0.2):
+        super().__init__(is_sanity_test, distance_threshold, reward_type, power)
         self.init_positions = [0] * self.action_space.shape[0]
         self.init_positions[11] = -0.2
         self._index = 0
@@ -568,13 +716,13 @@ class FetchMoveBlockEnv(BaseFetchEnv, ABC):
         self.joints_are_locked = not self.joints_are_locked
 
 
-class FetchCutBlockEnvRandom_v1(BaseFetchEnv, ABC):
-    def __init__(self):
+class FetchCutBlockEnvRandom(BaseFetchEnv, ABC):
+    def __init__(self, is_sanity_test=False, distance_threshold = 0, reward_type='default', power=0.2):
+        super().__init__(is_sanity_test, distance_threshold, reward_type, power)
         """
         Rewards the robot to cutting a block.
         Inits the arm to be grasping the knife.
         """
-        super().__init__()
 
         self.init_positions = [0] * self.action_space.shape[0]
         self.init_positions[11] = -0.72
@@ -620,8 +768,7 @@ class FetchCutBlockEnvRandom_v1(BaseFetchEnv, ABC):
         else:
             return False
 
-    @d_custom_reward_throw_bone
-    def get_custom_reward(self):
+    def get_custom_reward(self, achieved_goal=None, goal=None):
         """
         The reward for this function is increasing the number of scene objects, distance fingers to knife, touching the
         knife, moving the knife closer to the object.
@@ -670,13 +817,13 @@ class FetchCutBlockEnvRandom_v1(BaseFetchEnv, ABC):
         self.joints_are_locked = not self.joints_are_locked
 
 
-class FetchCutBlockEnv_v1(BaseFetchEnv, ABC):
-    def __init__(self):
+class FetchCutBlockEnv(BaseFetchEnv, ABC):
+    def __init__(self, is_sanity_test=False, distance_threshold = 0, reward_type='default', power=0.2):
+        super().__init__(is_sanity_test, distance_threshold, reward_type, power)
         """
         Rewards the robot to cutting a block.
         Inits the arm to be grasping the knife.
         """
-        super().__init__()
 
         self.init_positions = [0] * self.action_space.shape[0]
         self.init_positions[11] = -0.72
@@ -722,8 +869,7 @@ class FetchCutBlockEnv_v1(BaseFetchEnv, ABC):
         else:
             return False
 
-    @d_custom_reward_throw_bone
-    def get_custom_reward(self):
+    def get_custom_reward(self, achieved_goal=None, goal=None):
         """
         The reward for this function is increasing the number of scene objects, distance fingers to knife, touching the
         knife, moving the knife closer to the object.
@@ -772,13 +918,13 @@ class FetchCutBlockEnv_v1(BaseFetchEnv, ABC):
         self.joints_are_locked = not self.joints_are_locked
 
 
-class FetchCutBlockNoKnifeTouchRewardEnv_v1(BaseFetchEnv, ABC):
-    def __init__(self):
+class FetchCutBlockNoKnifeTouchRewardEnv(BaseFetchEnv, ABC):
+    def __init__(self, is_sanity_test=False, distance_threshold = 0, reward_type='default', power=0.2):
+        super().__init__(is_sanity_test, distance_threshold, reward_type, power)
         """
         Rewards the robot to cutting a block.
         Inits the arm to be grasping the knife.
         """
-        super().__init__()
 
         self.init_positions = [0] * self.action_space.shape[0]
         self.init_positions[11] = -0.72
@@ -824,8 +970,7 @@ class FetchCutBlockNoKnifeTouchRewardEnv_v1(BaseFetchEnv, ABC):
         else:
             return False
 
-    @d_custom_reward_throw_bone
-    def get_custom_reward(self):
+    def get_custom_reward(self, achieved_goal=None, goal=None):
         """
         The reward for this function is increasing the number of scene objects, distance fingers to knife, touching the
         knife, moving the knife closer to the object.
@@ -875,12 +1020,11 @@ class FetchCutBlockNoKnifeTouchRewardEnv_v1(BaseFetchEnv, ABC):
 
 
 class FetchLiftArmHighEnv(BaseFetchEnv, ABC):
-    def __init__(self):
+    def __init__(self, is_sanity_test=False, distance_threshold = 0, reward_type='default', power=0.2):
+        super().__init__(is_sanity_test, distance_threshold, reward_type, power)
         """
         Rewards the robot to lifting its arm high.
         """
-        super().__init__()
-
         self.max_ceiling = 2
         self.min_floor = 0.5
         self.randomCeiling = random.uniform(self.min_floor, self.max_ceiling)
@@ -917,8 +1061,7 @@ class FetchLiftArmHighEnv(BaseFetchEnv, ABC):
         self.scene = PickAndMoveScene(_p, gravity=9.8, timestep=0.0165 / 4, frame_skip=4)
         return self.scene
 
-    @d_custom_reward_throw_bone
-    def get_custom_reward(self):
+    def get_custom_reward(self, achieved_goal=None, goal=None):
 
         # Distance to the arm goal
         distance = np.linalg.norm(np.subtract([self.randomCeiling, self.randomCeiling],
@@ -946,12 +1089,12 @@ class FetchLiftArmHighEnv(BaseFetchEnv, ABC):
 
 
 class FetchLiftArmLowEnv(BaseFetchEnv, ABC):
-    def __init__(self):
+    def __init__(self, is_sanity_test=False, distance_threshold = 0, reward_type='default', power=0.2):
+        super().__init__(is_sanity_test, distance_threshold, reward_type, power)
         """
         The reward functions for this env will involve lifting the arm to the ground.
         It is expected the the robot will try to move the arm around the table.
         """
-        super().__init__()
 
         self._index = 0
         self.max_ceiling = 0.7
@@ -989,8 +1132,7 @@ class FetchLiftArmLowEnv(BaseFetchEnv, ABC):
         self.scene = PickAndMoveScene(_p, gravity=9.8, timestep=0.0165 / 4, frame_skip=4)
         return self.scene
 
-    @d_custom_reward_throw_bone
-    def get_custom_reward(self):
+    def get_custom_reward(self, achieved_goal=None, goal=None):
         # Distance to the arm goal
         distance = np.linalg.norm(np.subtract([self.randomCeiling, self.randomCeiling],
                                               [self.robot.l_gripper_finger_link.get_position()[2],
@@ -1021,9 +1163,8 @@ class FetchInternalKeepStillTrainEnv(BaseFetchEnv, ABC):
     The reward functions for this env will involve lifting the arm overhead
 
     """
-
-    def __init__(self):
-        super().__init__()
+    def __init__(self, is_sanity_test=False, distance_threshold = 0, reward_type='default', power=0.2):
+        super().__init__(is_sanity_test, distance_threshold, reward_type, power)
 
         self.joints_not_at_limit_cost = .3
         self.init_positions = [0] * self.action_space.shape[0]
@@ -1053,8 +1194,7 @@ class FetchInternalKeepStillTrainEnv(BaseFetchEnv, ABC):
         self.scene = PickAndMoveScene(_p, gravity=9.8, timestep=0.0165 / 4, frame_skip=4)
         return self.scene
 
-    @d_custom_reward_throw_bone
-    def get_custom_reward(self):
+    def get_custom_reward(self, achieved_goal=None, goal=None):
         """
         Reward Joints that are not breaking their limits.
 
