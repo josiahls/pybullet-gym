@@ -89,7 +89,7 @@ class BaseFetchEnv(BaseBulletEnv, ABC):
         self.reward = 0.0
         self.elapsed_time = 0
         self.elapsed_time_cost = 0.01
-        self.max_step_length = 100
+        self.max_step_length = 30
         self.min_step_length = 20
         self.max_state_space_object_size = 3
         self.use_image_as_state = False
