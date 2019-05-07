@@ -112,6 +112,8 @@ class BaseFetchEnv(BaseBulletEnv, ABC):
         print(f'Setting Environment: Doing Reward Aug? {self._do_reward_balancing} Doing joint locking? '
               f'{self.joints_are_locked}')
         for key in self.state_min_maxes:
+            if not os.path.exists(key):
+                os.mkdir(key)
             # Save the normalization fields:
             np.save(key, self.state_min_maxes[key])
 
@@ -557,6 +559,8 @@ class FetchSanityTestCartPoleEnv(BaseFetchEnv, ABC):
         print(f'Setting Environment: Doing Reward Aug? {self._do_reward_balancing} Doing joint locking? '
               f'{self.joints_are_locked}')
         for key in self.state_min_maxes:
+            if not os.path.exists(key):
+                os.mkdir(key)
             # Save the normalization fields:
             np.save(key, self.state_min_maxes[key])
 
@@ -628,6 +632,8 @@ class FetchSanityTestMountainCar(BaseFetchEnv, ABC):
         print(f'Setting Environment: Doing Reward Aug? {self._do_reward_balancing} Doing joint locking? '
               f'{self.joints_are_locked}')
         for key in self.state_min_maxes:
+            if not os.path.exists(key):
+                os.mkdir(key)
             # Save the normalization fields:
             np.save(key, self.state_min_maxes[key])
 
