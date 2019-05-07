@@ -112,8 +112,6 @@ class BaseFetchEnv(BaseBulletEnv, ABC):
         print(f'Setting Environment: Doing Reward Aug? {self._do_reward_balancing} Doing joint locking? '
               f'{self.joints_are_locked}')
         for key in self.state_min_maxes:
-            if not os.path.exists(key):
-                os.mkdir(key)
             # Save the normalization fields:
             np.save(key, self.state_min_maxes[key])
 
@@ -215,6 +213,9 @@ class BaseFetchEnv(BaseBulletEnv, ABC):
         return self.state
 
     def _normalize_states(self, state, filename='robot_state_min_max.npy'):
+        if not os.path.exists(os.path.join('.', 'normalization_weights')):
+            os.mkdir(os.path.join('.', 'normalization_weights'))
+
         filename = os.path.join('.', 'normalization_weights', filename)
         # Check if there exist cached min max information for normalization
         if filename not in self.state_min_maxes and os.path.exists(filename):
@@ -559,8 +560,6 @@ class FetchSanityTestCartPoleEnv(BaseFetchEnv, ABC):
         print(f'Setting Environment: Doing Reward Aug? {self._do_reward_balancing} Doing joint locking? '
               f'{self.joints_are_locked}')
         for key in self.state_min_maxes:
-            if not os.path.exists(key):
-                os.mkdir(key)
             # Save the normalization fields:
             np.save(key, self.state_min_maxes[key])
 
@@ -632,8 +631,6 @@ class FetchSanityTestMountainCar(BaseFetchEnv, ABC):
         print(f'Setting Environment: Doing Reward Aug? {self._do_reward_balancing} Doing joint locking? '
               f'{self.joints_are_locked}')
         for key in self.state_min_maxes:
-            if not os.path.exists(key):
-                os.mkdir(key)
             # Save the normalization fields:
             np.save(key, self.state_min_maxes[key])
 
