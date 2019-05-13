@@ -2,6 +2,11 @@ import numpy as np
 from pybullet_envs.bullet.bullet_client import BulletClient
 from pybullet_envs.scene_abstract import Scene
 import os
+
+from typing import List, Dict
+
+from .robot_bases import BodyPart
+from .utils import Normalizer
 from .robot_bases import URDFBasedRobot
 from .robot_bases import Joint
 import pybullet
@@ -12,7 +17,7 @@ from pybulletgym.envs.mujoco.robot_bases import XmlBasedRobot, MJCFBasedRobot
 
 class FetchURDF(URDFBasedRobot):
 
-    def __init__(self, power=0.2):
+    def __init__(self, power=0.2, action_locks=None):
         URDFBasedRobot.__init__(self, "fetch/fetch_description/robots/fetch.urdf", "base_link", action_dim=25,
                                 obs_dim=70, self_collision=True)
         self.power = power
@@ -25,14 +30,17 @@ class FetchURDF(URDFBasedRobot):
         self.initial_z = None
         self.joint_speeds = []
         self.joints_at_limit = []
-        self.lock_joints = [False] * self.action_space.shape[0]
+        self.normalize_state_space_output = True
+        self.parts = None  # type: Dict[str, BodyPart]
+        self.jdict = None  # type: Dict[str, Joint]
+        self.ordered_joints = None  # type: Dict[Joint]
+        self.robot_body = None
+        if action_locks is None:
+            self.lock_joints = [False] * self.action_space.shape[0]
+        else:
+            self.lock_joints = action_locks
 
         self.pos_after = 0
-
-        # Update the manipulator fields. We have these are fields so they are easier to interface with
-        self.r_gripper_finger_link = None  # type: Joint
-        self.l_gripper_finger_link = None  # type: Joint
-        self.gripper_link = None  # type: Joint
 
     def calc_state(self):
         """
@@ -69,12 +77,15 @@ class FetchURDF(URDFBasedRobot):
         if self.initial_z is None:
             self.initial_z = z
 
-        return np.concatenate([
-            j,
-            # qpos.flat[1:],  # self.sim.data.qpos.flat[1:],
-            # np.clip(qvel, -1, 1).flat  # self.sim.data.qvel.flat,
-            np.array(qvel)
+        state = np.concatenate([
+            qpos.flat[1:],  # self.sim.data.qpos.flat[1:],
+            np.clip(qvel, -1, 1).flat  # self.sim.data.qvel.flat,
         ])
+
+        if self.normalize_state_space_output:
+            state = Normalizer.normalize(state.reshape(1, -1), f'fetch_robot_{state.shape}')
+
+        return state
 
     def apply_action(self, a):
         assert (np.isfinite(a).all())
@@ -91,8 +102,9 @@ class FetchURDF(URDFBasedRobot):
         assert (np.isfinite(a).all())
         i = 0
         for n, j in enumerate(self.ordered_joints):
-            if j.power_coef != 0:  # in case the ignored joints are added, they have 0 power
-                j.set_position(a[n - i], maxVelocity)
+            if j.power_coef != 0 and not self.lock_joints[n]:  # in case the ignored joints are added, they have 0 power
+                pos = j.get_position()
+                j.set_position(pos + a[n - i], maxVelocity)
             else:
                 i += 1
 
@@ -146,10 +158,6 @@ class FetchURDF(URDFBasedRobot):
             self.parts[part].reset_pose(self.parts[part].initialPosition, self.parts[part].initialOrientation)
         self.reset_pose([0, 0, 0.01], [0, 0, 0, 1])
         self.initial_z = None
-
-        self.r_gripper_finger_link = self.parts['r_gripper_finger_link']
-        self.l_gripper_finger_link = self.parts['l_gripper_finger_link']
-        self.gripper_link = self.parts['gripper_link']
 
     def alive_bonus(self, z, pitch):
         # print(f'alive_bonus: {z} and {self.body_xyz[2]} subtraction is: {z - self.body_xyz[2]}')

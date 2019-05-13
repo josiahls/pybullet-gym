@@ -5,6 +5,7 @@ import pybullet as p
 
 import gym
 
+
 class Scene:
     "A base class for single- and multiplayer scenes"
 
@@ -51,8 +52,10 @@ class Scene:
         """
         self.cpp_world.step(self.frame_skip)
 
+
 class SingleRobotEmptyScene(Scene):
     multiplayer = False  # this class is used "as is" for InvertedPendulum, Reacher
+
 
 class World:
 

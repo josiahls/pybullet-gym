@@ -8,7 +8,7 @@ import numpy as np
 
 from .scene_bases import Scene
 from .scene_object_bases import SceneObject, SlicingSceneObject, SlicableSceneObject, TargetSceneObject, \
-    ProjectileSceneObject
+    ProjectileSceneObject, Features
 
 currentdir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
 parentdir = os.path.dirname(currentdir)
@@ -23,7 +23,7 @@ class SceneFetch(Scene):
         self.sceneLoaded = 0
         self.scene_objects = []  # type: List[SceneObject]
 
-    def _dynamic_object_clear(self):
+    def _actionable_object_clear(self):
         """
         Some objects might be split into smaller objects or duplicated.
         The original state will most likely not have this, so calling this method is
@@ -49,12 +49,12 @@ class SceneFetch(Scene):
                 if not scene_object.reloadable:
                     self.scene_objects.remove(scene_object)
 
-    def dynamic_object_reset(self, bullet_client: pybullet):
+    def actionable_object_reset(self, bullet_client: pybullet):
         # Load scene objects that require interaction
         for scene_object in self.scene_objects:
             scene_object.reload()
 
-    def calc_state(self):
+    def calc_state(self) -> np.array:
         """
         We want to update the states of the objects of interest during manipulation.
         The main interest is the position of each of the objects of interest so we can
@@ -67,14 +67,11 @@ class SceneFetch(Scene):
 
         Max Num Objects x Features
 
-        :return: The scene state.
+        :return: The scene state. By Default, the array will be flattened.
         """
-        object_states = []
-
-        """ Handle the knife blade collision """
-        for scene_object in list(reversed([_ for _ in self.scene_objects if not _.removed])):
-            object_states.append(scene_object.calc_state(self))
-        return object_states
+        object_states = np.array([_.calc_state(self) for _ in reversed([_ for _ in self.scene_objects
+                                                                        if not _.removed])])
+        return object_states.reshape(-1, len(Features()))
 
     def get_goal(self):
         pass
@@ -243,7 +240,7 @@ class PickKnifeAndCutTestScene(SceneFetch):
         :param bullet_client:
         :return:
         """
-        self._dynamic_object_clear()
+        self._actionable_object_clear()
 
         if self.sceneLoaded == 1:
             self.sceneLoaded = 2
@@ -296,7 +293,7 @@ class PickAndMoveScene(SceneFetch):
                                     "plane.urdf")
             self._p.loadURDF(filename)
 
-    def dynamic_object_reset(self, bullet_client: pybullet):
+    def actionable_object_reset(self, bullet_client: pybullet):
         """
 
             As a note, the remove order does not matter, the reload does matter.
@@ -305,7 +302,7 @@ class PickAndMoveScene(SceneFetch):
         :param bullet_client:
         :return:
         """
-        self._dynamic_object_clear()
+        self._actionable_object_clear()
 
         if self.sceneLoaded == 1:
             self.sceneLoaded = 2
@@ -407,7 +404,7 @@ class KnifeCutScene(SceneFetch):
                                                                pybullet.URDF_USE_MATERIAL_TRANSPARANCY_FROM_MTL,
                                                          slicing_parts=['blade']))
 
-    def dynamic_object_reset(self, bullet_client: pybullet):
+    def actionable_object_reset(self, bullet_client: pybullet):
         """
 
             As a note, the remove order does not matter, the reload does matter.
@@ -416,7 +413,7 @@ class KnifeCutScene(SceneFetch):
         :param bullet_client:
         :return:
         """
-        self._dynamic_object_clear()
+        self._actionable_object_clear()
 
         if self.sceneLoaded == 1:
             self.sceneLoaded = 2
@@ -459,3 +456,55 @@ class KnifeCutScene(SceneFetch):
                     )
 
                 scene_object.reset_position(object_position)
+
+
+class KnifeScene(SceneFetch):
+    """
+    The goal of this scene is to set up a scene for picking up a knife, and cutting a sphere or a square
+
+    """
+
+    def __init__(self, bullet_client, gravity, timestep, frame_skip, randomize=False):
+        super().__init__(bullet_client, gravity, timestep, frame_skip)
+
+        self.multiplayer = False
+        self.randomize = randomize
+        self.sceneLoaded = 0
+        self.scene_objects = []  # type: List[SceneObject]
+        self.object_features = {'pos_x': 0, 'pos_y': 0,
+                                'pos_z': 0,
+                                'or_x': 0,
+                                'or_y': 0,
+                                'or_z': 0, 'width': 0,
+                                'height': 0, 'length': 0, 'radius': 0, 'obj_type': 0, 'obj_internal_state': 0}
+
+    def episode_restart(self, bullet_client: pybullet):
+        self._p = bullet_client
+        Scene.episode_restart(self, bullet_client)
+
+        """ If the scene isn't loaded, then load the models """
+        if self.sceneLoaded <= 0:
+            self.sceneLoaded = 1
+
+            # Load the table
+            filename = os.path.join(os.path.dirname(__file__), "..", "assets", "things", "cubes",
+                                    "cube_table.urdf")
+            self._p.loadURDF(filename, [0.7, 0, 0.23], [0, 0, 90, 90])
+            # Load the plane
+            filename = os.path.join(os.path.dirname(__file__), "..", "assets", "things", "plane",
+                                    "plain_plane.urdf")
+            self._p.loadURDF(filename)
+
+            filename = os.path.join(os.path.dirname(__file__), "..", "assets", "things", "knives",
+                                    "knife.urdf")
+            self.scene_objects.append(SlicingSceneObject(bullet_client, filename, [0.78, 0, 0.67],
+                                                         self._p.getQuaternionFromEuler(
+                                                             [np.deg2rad(90), 0, np.deg2rad(-90)]),
+                                                         flags=pybullet.URDF_USE_MATERIAL_COLORS_FROM_MTL |
+                                                               pybullet.URDF_USE_MATERIAL_TRANSPARANCY_FROM_MTL,
+                                                         slicing_parts=['blade']))
+            # Load the cube
+            filename = os.path.join(os.path.dirname(__file__), "..", "assets", "things", "spheres",
+                                    "sphere_small_target.urdf")
+            self.scene_objects.append(TargetSceneObject(self._p, filename, [.75, 0, 0.60], removable=False,
+                                                        randomize=True, random_range=(.25, .25, .12)))

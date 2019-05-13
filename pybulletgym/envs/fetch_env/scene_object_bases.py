@@ -64,17 +64,25 @@ class SceneObject(BodyPart):
             self._p.removeBody(self.bodyIndex)
             self.removed = True
 
-    def calc_state(self, scene) -> namedtuple:
+    def calc_state(self, scene) -> np.array:
         """
         Updates the external and internal state of the scene object.
 
-        :param scene:
-        :return:
+        Returns an nd.array shape: (F,) where F is the number of features at are::
+
+            ['pos_x', 'pos_y', 'pos_z', 'or_x', 'or_y', 'or_z', 'width', 'height', 'length',
+            'radius', 'obj_type', 'obj_internal_state'] (12 features)
+
+        Args:
+            scene:
+
+        Returns:
+
         """
         features = Features()
 
         if self.removed:
-            return tuple(features)
+            return np.array(features)
 
         features.pos_x = self.get_position()[0]
         features.pos_y = self.get_position()[1]
@@ -101,7 +109,7 @@ class SceneObject(BodyPart):
         features.obj_internal_state = self._get_internal_state(scene)
 
         # Before returning, we use the namedtuple to verify that all the field required are filled
-        return tuple(features)
+        return np.array(features)
 
     def _get_internal_state(self, scene) -> float:
         """
@@ -192,13 +200,13 @@ class TargetSceneObject(SceneObject):
     def reload(self):
         super(TargetSceneObject, self).reload()
         # Target Objects have the option to randomize their positions
-        if self.randomize and self.random_range is not None:
-            pos = self.params['basePosition']
-            self.reset_position((
-                np.random.uniform(pos[0] - self.random_range[0], pos[0] + self.random_range[0]),
-                np.random.uniform(pos[1] - self.random_range[1], pos[1] + self.random_range[1]),
-                np.random.uniform(pos[2] - self.random_range[2], pos[2] + self.random_range[2])
-            ))
+        # if self.randomize and self.random_range is not None:
+        #     pos = self.params['basePosition']
+        #     self.reset_position((
+        #         np.random.uniform(pos[0] - self.random_range[0], pos[0] + self.random_range[0]),
+        #         np.random.uniform(pos[1] - self.random_range[1], pos[1] + self.random_range[1]),
+        #         np.random.uniform(pos[2] - self.random_range[2], pos[2] + self.random_range[2])
+        #     ))
 
     def set_objects_to_compare(self, objects_to_compare):
         self.objects_to_compare = objects_to_compare
@@ -267,14 +275,14 @@ class ProjectileSceneObject(SceneObject):
 
     def reload(self):
         super(ProjectileSceneObject, self).reload()
-        # Target Objects have the option to randomize their positions
-        if self.randomize and self.random_range is not None:
-            pos = self.params['basePosition']
-            self.reset_position((
-                np.random.uniform(pos[0] - self.random_range[0], pos[0] + self.random_range[0]),
-                np.random.uniform(pos[1] - self.random_range[1], pos[1] + self.random_range[1]),
-                np.random.uniform(pos[2] - self.random_range[2], pos[2] + self.random_range[2])
-            ))
+        # # Target Objects have the option to randomize their positions
+        # if self.randomize and self.random_range is not None:
+        #     pos = self.params['basePosition']
+        #     self.reset_position((
+        #         np.random.uniform(pos[0] - self.random_range[0], pos[0] + self.random_range[0]),
+        #         np.random.uniform(pos[1] - self.random_range[1], pos[1] + self.random_range[1]),
+        #         np.random.uniform(pos[2] - self.random_range[2], pos[2] + self.random_range[2])
+        #     ))
 
     def set_objects_to_compare(self, objects_to_compare):
         self.objects_to_compare = objects_to_compare

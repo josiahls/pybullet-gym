@@ -8,6 +8,8 @@ import numpy as np
 from pkg_resources import parse_version
 from pybullet_envs.bullet import bullet_client
 
+from .robot_locomotors import FetchURDF
+
 
 class BaseBulletEnv(gym.Env):
     """
@@ -27,7 +29,7 @@ class BaseBulletEnv(gym.Env):
         self.ownsPhysicsClient = 0
         self.camera = Camera()
         self.isRender = render
-        self.robot = robot
+        self.robot = robot  # type: FetchURDF
         self._seed()
         self._cam_dist = 3
         self._cam_yaw = 0

@@ -151,18 +151,17 @@ register(
 )
 
 """ FETCH ENVS """
-
 register(
 	id='FetchCutBlockEnv-v1',
 	entry_point='pybulletgym.envs.fetch_env.gym_locomotion_envs:FetchCutBlockEnv',
 	max_episode_steps=100000
 )
 
-register(
-	id='FetchReach-v0',
-	entry_point='pybulletgym.envs.fetch_env.gym_locomotion_envs:FetchReach',
-	max_episode_steps=100000
-)
+# register(
+# 	id='FetchReach-v0',
+# 	entry_point='pybulletgym.envs.fetch_env.gym_locomotion_envs:FetchReach',
+# 	max_episode_steps=100000
+# )
 
 register(
 	id='FetchPush-v0',
@@ -223,6 +222,31 @@ register(
 register(
 	id='FetchInternalKeepStillTrainEnv-v0',
 	entry_point='pybulletgym.envs.fetch_env.gym_locomotion_envs:FetchInternalKeepStillTrainEnv',
+	max_episode_steps=100000
+)
+
+""" Fetch Env v2 """
+register(
+	id='FetchReach-v2',
+	entry_point='pybulletgym.envs.fetch_env.gym_locomotion_envs_v2:FetchReach',
+	max_episode_steps=100000
+)
+
+register(
+	id='FetchSlide-v2',
+	entry_point='pybulletgym.envs.fetch_env.gym_locomotion_envs_v2:FetchSlide',
+	max_episode_steps=100000
+)
+
+register(
+	id='FetchPickAndPlace-v2',
+	entry_point='pybulletgym.envs.fetch_env.gym_locomotion_envs_v2:FetchPickAndPlace',
+	max_episode_steps=100000
+)
+
+register(
+	id='FetchPickKnifeAndPlace-v2',
+	entry_point='pybulletgym.envs.fetch_env.gym_locomotion_envs_v2:FetchPickKnifeAndPlace',
 	max_episode_steps=100000
 )
 

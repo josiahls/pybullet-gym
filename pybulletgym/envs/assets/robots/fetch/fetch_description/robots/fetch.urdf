@@ -255,7 +255,7 @@
         </collision>
     </link>
     <joint name="upperarm_roll_joint" type="continuous">
-        <origin rpy="3.3 0 0" xyz="0.219 0 0"/>
+        <origin rpy="3.15 0 0" xyz="0.219 0 0"/>
         <parent link="shoulder_lift_link"/>
         <child link="upperarm_roll_link"/>
         <axis xyz="1 0 0"/>

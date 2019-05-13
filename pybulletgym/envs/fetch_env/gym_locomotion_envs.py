@@ -136,7 +136,7 @@ class BaseFetchEnv(BaseBulletEnv, ABC):
         # We want to clear the dynamic objects that might have been modified / added.
         # We need to do this so that we can avoid a saved state mismatch.
         if self.scene is not None:
-            self.scene._dynamic_object_clear()
+            self.scene._actionable_object_clear()
 
         # The original state will only contain objects that never change i.e.
         # Never get added or removed during the course of an episode.
@@ -159,7 +159,7 @@ class BaseFetchEnv(BaseBulletEnv, ABC):
             self.stateId = self._p.saveState()
 
         # Load dynamic objects
-        self.scene.dynamic_object_reset(self._p)
+        self.scene.actionable_object_reset(self._p)
 
         # Update the robot init position if available
         # while not self.init_robot_pose():
@@ -334,54 +334,54 @@ class BaseFetchEnv(BaseBulletEnv, ABC):
     def get_achieved_goal(self):
         pass
 
-
-class FetchReach(BaseFetchEnv, ABC):
-    def __init__(self, is_sanity_test=False, distance_threshold = 0, reward_type='default', power=0.2):
-        super().__init__(is_sanity_test, distance_threshold, reward_type, power)
-
-    def create_single_player_scene(self, _p: BulletClient):
-        self.scene = ReachScene(_p, gravity=9.8, timestep=0.0165 / 4, frame_skip=4)
-        return self.scene
-
-    def get_custom_reward(self, achieved_goal=None, goal=None):
-        if achieved_goal is None:
-            achieved_goal = self.get_achieved_goal()
-
-        if goal is None:
-            goal = self.scene.get_goal()[0]
-        
-        assert achieved_goal is not None, 'The achieved_goal is None. Needs to be an np.array'
-        assert goal is not None, 'The goal is None. Needs to be an np.array'
-
-        d = self._goal_distance(achieved_goal, goal)
-        if self.reward_type == 'sparse':
-            return -(d > self.distance_threshold).astype(np.float32)
-        else:
-            return -d
-
-    def execute_joint_lock(self, should_lock=None):
-        if should_lock is not None and type(should_lock) is bool:
-            self.joints_are_locked = should_lock
-        if self.joints_are_locked:
-            self.robot.lock_joints = [True] * self.action_space.shape[0]
-            self.robot.lock_joints[10] = False  # Unlock 'shoulder_pan_joint
-            self.robot.lock_joints[11] = False  # Unlock 'shoulder_lift_joint'
-            # self.robot.lock_joints[12] = False  # Unlock 'upperarm_roll_joint'
-            self.robot.lock_joints[13] = False  # Unlock 'elbow_flex_joint'
-            # self.robot.lock_joints[14] = False  # Unlock 'forearm_roll_joint'
-            self.robot.lock_joints[15] = False  # Unlock 'wrist_flex_joint'
-            # self.robot.lock_joints[16] = False  # Unlock 'wrist_roll_joint'
-            self.robot.lock_joints[17] = False  # Unlock 'gripper_axis'
-            self.robot.lock_joints[18] = False  # Unlock 'r_gripper_finger_joint'
-            self.robot.lock_joints[19] = False  # Unlock 'l_gripper_finger_joint'
-        else:
-            self.robot.lock_joints = [False] * self.action_space.shape[0]
-
-        self.joints_are_locked = not self.joints_are_locked
-
-    def get_achieved_goal(self):
-        return np.average((self.robot.l_gripper_finger_link.get_position(),
-                           self.robot.r_gripper_finger_link.get_position()), axis=0)
+#
+# class FetchReach(BaseFetchEnv, ABC):
+#     def __init__(self, is_sanity_test=False, distance_threshold = 0, reward_type='default', power=0.2):
+#         super().__init__(is_sanity_test, distance_threshold, reward_type, power)
+#
+#     def create_single_player_scene(self, _p: BulletClient):
+#         self.scene = ReachScene(_p, gravity=9.8, timestep=0.0165 / 4, frame_skip=4)
+#         return self.scene
+#
+#     def get_custom_reward(self, achieved_goal=None, goal=None):
+#         if achieved_goal is None:
+#             achieved_goal = self.get_achieved_goal()
+#
+#         if goal is None:
+#             goal = self.scene.get_goal()[0]
+#
+#         assert achieved_goal is not None, 'The achieved_goal is None. Needs to be an np.array'
+#         assert goal is not None, 'The goal is None. Needs to be an np.array'
+#
+#         d = self._goal_distance(achieved_goal, goal)
+#         if self.reward_type == 'sparse':
+#             return -(d > self.distance_threshold).astype(np.float32)
+#         else:
+#             return -d
+#
+#     def execute_joint_lock(self, should_lock=None):
+#         if should_lock is not None and type(should_lock) is bool:
+#             self.joints_are_locked = should_lock
+#         if self.joints_are_locked:
+#             self.robot.lock_joints = [True] * self.action_space.shape[0]
+#             self.robot.lock_joints[10] = False  # Unlock 'shoulder_pan_joint
+#             self.robot.lock_joints[11] = False  # Unlock 'shoulder_lift_joint'
+#             # self.robot.lock_joints[12] = False  # Unlock 'upperarm_roll_joint'
+#             self.robot.lock_joints[13] = False  # Unlock 'elbow_flex_joint'
+#             # self.robot.lock_joints[14] = False  # Unlock 'forearm_roll_joint'
+#             self.robot.lock_joints[15] = False  # Unlock 'wrist_flex_joint'
+#             # self.robot.lock_joints[16] = False  # Unlock 'wrist_roll_joint'
+#             self.robot.lock_joints[17] = False  # Unlock 'gripper_axis'
+#             self.robot.lock_joints[18] = False  # Unlock 'r_gripper_finger_joint'
+#             self.robot.lock_joints[19] = False  # Unlock 'l_gripper_finger_joint'
+#         else:
+#             self.robot.lock_joints = [False] * self.action_space.shape[0]
+#
+#         self.joints_are_locked = not self.joints_are_locked
+#
+#     def get_achieved_goal(self):
+#         return np.average((self.robot.l_gripper_finger_link.get_position(),
+#                            self.robot.r_gripper_finger_link.get_position()), axis=0)
 
 
 class FetchPickAndPlace(BaseFetchEnv, ABC):
