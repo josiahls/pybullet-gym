@@ -272,7 +272,7 @@ class BaseFetchEnv(BaseBulletEnv, gym.GoalEnv, ABC):
             # if multiplayer, action first applied to all robots, then global step() called, then _step()
             # for all robots with the same actions
             # self.robot.apply_action(action)
-            self.robot.apply_positions(action, 1)
+            self.robot.apply_positions(action, 0.2)
 
     def _is_success(self, achieved_goal, desired_goal):
         """Indicates whether or not the achieved goal successfully achieved the desired goal.

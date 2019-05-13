@@ -102,9 +102,12 @@ class FetchURDF(URDFBasedRobot):
         assert (np.isfinite(a).all())
         i = 0
         for n, j in enumerate(self.ordered_joints):
-            if j.power_coef != 0 and not self.lock_joints[n]:  # in case the ignored joints are added, they have 0 power
+            if j.power_coef != 0:  # in case the ignored joints are added, they have 0 power
                 pos = j.get_position()
-                j.set_position(pos + a[n - i], maxVelocity)
+                if not self.lock_joints[n]:
+                    j.set_position(pos + a[n - i], maxVelocity)
+                else:
+                    j.set_position(pos, maxVelocity)
             else:
                 i += 1
 
