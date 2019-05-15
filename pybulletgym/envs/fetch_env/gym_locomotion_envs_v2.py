@@ -67,7 +67,7 @@ class BaseFetchEnv(BaseBulletEnv, gym.GoalEnv, ABC):
     def __init__(self, initial_qpos: dict = None, robot: FetchURDF = None, block_gripper=True, n_substeps=20,
                  gripper_extra_height=0.48,
                  target_in_the_air=True, target_offset=0.0, obj_range=0.15, target_range=0.25,
-                 distance_threshold=0.08, reward_type: str = 'default',
+                 distance_threshold=0.08, reward_type: str = 'sparse',
                  power=0.2):
         """
 
