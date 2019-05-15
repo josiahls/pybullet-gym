@@ -229,31 +229,31 @@ register(
 register(
 	id='FetchReach-v2',
 	entry_point='pybulletgym.envs.fetch_env.gym_locomotion_envs_v2:FetchReach',
-	max_episode_steps=100000
+	max_episode_steps=50,
 )
 
 register(
 	id='FetchSlide-v2',
 	entry_point='pybulletgym.envs.fetch_env.gym_locomotion_envs_v2:FetchSlide',
-	max_episode_steps=100000
+	max_episode_steps=50,
 )
 
 register(
 	id='FetchPickAndPlace-v2',
 	entry_point='pybulletgym.envs.fetch_env.gym_locomotion_envs_v2:FetchPickAndPlace',
-	max_episode_steps=100000
+	max_episode_steps=50,
 )
 
 register(
 	id='FetchPickKnifeAndPlace-v2',
 	entry_point='pybulletgym.envs.fetch_env.gym_locomotion_envs_v2:FetchPickKnifeAndPlace',
-	max_episode_steps=100000
+	max_episode_steps=50,
 )
 
 register(
 	id='FetchMountainCar-v2',
 	entry_point='pybulletgym.envs.fetch_env.gym_locomotion_envs_v2:FetchMountainCar',
-	max_episode_steps=100000
+	max_episode_steps=50,
 )
 
 

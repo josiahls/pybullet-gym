@@ -111,6 +111,7 @@ class BaseFetchEnv(BaseBulletEnv, gym.GoalEnv, ABC):
             BaseBulletEnv.__init__(self, robot)
 
         self.observation_space = None  # type: spaces.Dict
+        self.reset() # here
 
     def seed(self, seed=None):
         self.np_random, seed = seeding.np_random(seed)
@@ -226,7 +227,7 @@ class BaseFetchEnv(BaseBulletEnv, gym.GoalEnv, ABC):
 
         self.goal = self._sampled_goal_callback()
         return {
-            'observation': self.state,
+            'observation': self.state.flatten(),
             'achieved_goal': self._achieved_goal_callback(),
             'desired_goal': self._sampled_goal_callback(),
         }
@@ -241,7 +242,7 @@ class BaseFetchEnv(BaseBulletEnv, gym.GoalEnv, ABC):
         Returns:
 
         """
-        return self.robot.parts['gripper_link'].get_position()
+        return self.robot.parts['gripper_link'].get_position().flatten()
 
     def _sampled_goal_callback(self, goal=None) -> np.array:
         """
@@ -256,8 +257,8 @@ class BaseFetchEnv(BaseBulletEnv, gym.GoalEnv, ABC):
         """
         for scene_object in self.scene.scene_objects:
             if type(scene_object) is TargetSceneObject:
-                return scene_object.get_position()
-        return goal
+                return scene_object.get_position().flatten()
+        return goal.flatten()
 
     def _env_specific_callback(self):
         for scene_object in self.scene.scene_objects:
