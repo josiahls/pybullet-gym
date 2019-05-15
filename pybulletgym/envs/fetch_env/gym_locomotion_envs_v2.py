@@ -175,6 +175,14 @@ class BaseFetchEnv(BaseBulletEnv, gym.GoalEnv, ABC):
         pass
 
     def _reset_sim(self):
+        try:
+            if self._p is not None:
+                self._p.getNumBodies()
+        except pybullet.error:
+            self.stateId = -1
+            self.robot.__init__(self.robot.power, self.robot.lock_joints)
+            BaseBulletEnv.__init__(self, self.robot)
+
         if self.physicsClientId < 0:
             self.ownsPhysicsClient = True
 
