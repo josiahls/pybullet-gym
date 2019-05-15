@@ -99,6 +99,7 @@ class BaseFetchEnv(BaseBulletEnv, gym.GoalEnv, ABC):
         self._p = None  # type: BulletClient
         self.goal = None
         self.reward_type = reward_type
+        self.reward_threshold = -5
         self.distance_threshold = distance_threshold
         self.stateId = -1
         self.n_trackable_objects = 5
