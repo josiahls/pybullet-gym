@@ -11,7 +11,8 @@ env_list = [
     # 'FetchReach-v2',
     # 'FetchSlide-v2',
     # 'FetchPickAndPlace-v2',
-    'FetchPickKnifeAndPlace-v2'
+    # 'FetchPickKnifeAndPlace-v2',
+    'FetchMountainCar-v2'
 ]
 
 for env_name in env_list:
@@ -32,7 +33,7 @@ for env_name in env_list:
 
     for i in range(80):
         for _ in range(25):
-            # print(env.render(mode="human"))
+            print(env.render(mode="human"))
             # results = env.step(env.action_space.sample())
             # fetchPos, fetchOrn = env.env._p.getBasePositionAndOrientation(baseId)
             # distance = 1.5

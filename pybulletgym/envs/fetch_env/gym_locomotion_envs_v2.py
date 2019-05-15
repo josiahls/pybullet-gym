@@ -64,7 +64,7 @@ from .robot_locomotors import FetchURDF
 
 
 class BaseFetchEnv(BaseBulletEnv, gym.GoalEnv, ABC):
-    def __init__(self, initial_qpos: dict, robot: FetchURDF = None, block_gripper=True, n_substeps=20,
+    def __init__(self, initial_qpos: dict = None, robot: FetchURDF = None, block_gripper=True, n_substeps=20,
                  gripper_extra_height=0.48,
                  target_in_the_air=True, target_offset=0.0, obj_range=0.15, target_range=0.25,
                  distance_threshold=0.08, reward_type: str = 'default',
@@ -105,6 +105,7 @@ class BaseFetchEnv(BaseBulletEnv, gym.GoalEnv, ABC):
         self._use_image_state = False
         self._im_size_fac = 10  # Factor to reduce the image by
         self.initial_qpos = initial_qpos  # type: Dict[str, None]
+        self.robot = None  # If not None, will be set in the parent super call
 
         if robot is not None:
             BaseBulletEnv.__init__(self, robot)
@@ -117,7 +118,12 @@ class BaseFetchEnv(BaseBulletEnv, gym.GoalEnv, ABC):
 
     def goal_distance(self, goal_a: np.ndarray, goal_b: np.ndarray):
         assert goal_a.shape == goal_b.shape
-        return np.linalg.norm(goal_a - goal_b, axis=-1)
+
+        distance = goal_a - goal_b
+        if type(distance) is np.array:
+            return np.linalg.norm(goal_a - goal_b, axis=-1)
+        else:
+            return np.linalg.norm(goal_a - goal_b)
 
     def compute_reward(self, achieved_goal: np.ndarray, goal, info):
         # Compute distance between goal and the achieved goal.
@@ -586,3 +592,40 @@ class FetchPickKnifeAndPlace(BaseFetchEnv, ABC):
                 # noinspection PyUnresolvedReferences
                 return scene_object.slice_parts[0].get_position()
         return None
+
+
+""" Testing Environments """
+
+
+class FetchMountainCar(BaseFetchEnv, ABC):
+    def __init__(self):
+        self.env = gym.make('MountainCar-v0')
+        self.position = None
+        self.action_space = self.env.action_space
+
+        super().__init__(target_in_the_air=False, reward_type='sparse')
+
+    def reset(self):
+        obs = self.env.reset()
+        obs = {
+            'observation': np.array(obs).reshape(1, -1),
+            'achieved_goal': np.array(obs[0]),
+            'desired_goal': np.array(self.env.env.goal_position),
+        }
+        return obs
+
+    def render(self, mode='human'):
+        if mode == 'human':
+            return self.env.render(mode)
+        else:
+            return np.array([])
+
+    def step(self, action):
+        obs, reward, done, info = self.env.step(np.argmax(action))
+        obs = {
+            'observation': np.array(obs).reshape(1, -1),
+            'achieved_goal': np.array(obs[0]),
+            'desired_goal': np.array(self.env.env.goal_position),
+        }
+        info['is_success'] = self._is_success(obs['achieved_goal'], obs['desired_goal'])
+        return obs, reward, done, info

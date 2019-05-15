@@ -250,6 +250,12 @@ register(
 	max_episode_steps=100000
 )
 
+register(
+	id='FetchMountainCar-v2',
+	entry_point='pybulletgym.envs.fetch_env.gym_locomotion_envs_v2:FetchMountainCar',
+	max_episode_steps=100000
+)
+
 
 def get_list():
 	envs = ['- ' + spec.id for spec in gym.pgym.envs.registry.all() if spec.id.find('Bullet') >= 0 or spec.id.find('MuJoCo') >= 0]
