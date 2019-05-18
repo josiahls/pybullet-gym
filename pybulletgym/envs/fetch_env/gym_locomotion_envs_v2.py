@@ -108,11 +108,23 @@ class BaseFetchEnv(BaseBulletEnv, gym.GoalEnv, ABC):
         self.initial_qpos = initial_qpos  # type: Dict[str, None]
         self.robot = None  # If not None, will be set in the parent super call
 
+        # If true, then only the unlocked actions will be considered this means that when a model is learnign to move,
+        # the expected action space output will be only the unlocked actions, as opposed to all actions.
+        # This is so that we can have a model that trains faster.
+        self.action_space_only_unlocked = True
+
         if robot is not None:
+            if self.action_space_only_unlocked:
+                robot.action_space_only_unlocked = self.action_space_only_unlocked
+                high = np.ones([sum(~np.array(robot.lock_joints))])
+                robot.action_space = gym.spaces.Box(-high, high)
+                high = np.inf * np.ones([sum(~np.array(robot.lock_joints))])
+                robot.observation_space = gym.spaces.Box(-high, high)
+
             BaseBulletEnv.__init__(self, robot)
 
         self.observation_space = None  # type: spaces.Dict
-        self.reset() # here
+        # self.reset() # here
 
     def seed(self, seed=None):
         self.np_random, seed = seeding.np_random(seed)
@@ -183,6 +195,11 @@ class BaseFetchEnv(BaseBulletEnv, gym.GoalEnv, ABC):
             self.robot.__init__(self.robot.power, self.robot.lock_joints)
             BaseBulletEnv.__init__(self, self.robot)
 
+        if self.action_space_only_unlocked:
+            self.robot.action_space_only_unlocked = self.action_space_only_unlocked
+            high = np.ones([sum(~np.array(self.robot.lock_joints))])
+            self.action_space = gym.spaces.Box(-high, high)
+
         if self.physicsClientId < 0:
             self.ownsPhysicsClient = True
 
@@ -190,7 +207,6 @@ class BaseFetchEnv(BaseBulletEnv, gym.GoalEnv, ABC):
                 self._p = BulletClient(connection_mode=pybullet.GUI)
             else:
                 self._p = BulletClient()
-
             # noinspection PyProtectedMember
             self.physicsClientId = self._p._client
             self._p.configureDebugVisualizer(pybullet.COV_ENABLE_GUI, 0)

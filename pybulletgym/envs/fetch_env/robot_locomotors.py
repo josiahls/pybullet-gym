@@ -35,6 +35,7 @@ class FetchURDF(URDFBasedRobot):
         self.jdict = None  # type: Dict[str, Joint]
         self.ordered_joints = None  # type: Dict[Joint]
         self.robot_body = None
+        self.action_space_only_unlocked = False
         if action_locks is None:
             self.lock_joints = [False] * self.action_space.shape[0]
         else:
@@ -90,9 +91,12 @@ class FetchURDF(URDFBasedRobot):
     def apply_action(self, a):
         assert (np.isfinite(a).all())
         i = 0
+        ii = 0
         for n, j in enumerate(self.ordered_joints):
             if j.power_coef != 0 and not self.lock_joints[n]:  # in case the ignored joints are added, they have 0 power
-                j.set_motor_torque(self.power * j.power_coef * float(np.clip(a[n - i], -1, +1)))
+                _a = a[n - i] if not self.action_space_only_unlocked else a[ii]
+                ii += 1
+                j.set_motor_torque(self.power * j.power_coef * float(np.clip(_a, -1, +1)))
             elif self.lock_joints[n]:
                 j.set_velocity(0)
             else:
@@ -101,11 +105,14 @@ class FetchURDF(URDFBasedRobot):
     def apply_positions(self, a, maxVelocity=None):
         assert (np.isfinite(a).all())
         i = 0
+        ii = 0
         for n, j in enumerate(self.ordered_joints):
             if j.power_coef != 0:  # in case the ignored joints are added, they have 0 power
                 pos = j.get_position()
                 if not self.lock_joints[n]:
-                    j.set_position(pos + a[n - i], maxVelocity)
+                    _a = a[n - i] if not self.action_space_only_unlocked else a[ii]
+                    ii += 1
+                    j.set_position(pos + _a, maxVelocity)
                 else:
                     j.set_position(pos, maxVelocity)
             else:

@@ -11,8 +11,8 @@ env_list = [
     # 'FetchReach-v2',
     # 'FetchSlide-v2',
     # 'FetchPickAndPlace-v2',
-    # 'FetchPickKnifeAndPlace-v2',
-    'FetchMountainCar-v2'
+    'FetchPickKnifeAndPlace-v2',
+    # 'FetchMountainCar-v2'
 ]
 
 for env_name in env_list:
@@ -20,6 +20,8 @@ for env_name in env_list:
     print(f'Testing {env_name}')
     # Load the OpenAI gym env
     env = gym.make(env_name)  # type: gym.Env
+    if hasattr(env.env, 'action_space_only_unlocked'):
+        env.env.action_space_only_unlocked = True
 
     # Render the display and perform reset operations that set up the state
     # env.reset()
@@ -29,10 +31,10 @@ for env_name in env_list:
     env.render(mode="human")
     env.reset()
 
-    plotter = Plotter()
+    # plotter = Plotter()
 
-    for i in range(80):
-        for _ in range(25):
+    for i in range(1):
+        for _ in range(5):
             print(env.render(mode="human"))
             # results = env.step(env.action_space.sample())
             # fetchPos, fetchOrn = env.env._p.getBasePositionAndOrientation(baseId)
@@ -41,9 +43,11 @@ for env_name in env_list:
             # env.env._p.resetDebugVisualizerCamera(distance, yaw, -45, fetchPos)
 
             # results = env.step(np.zeros(env.action_space.high.shape))
-            results = env.step(env.action_space.sample())
+            action = env.action_space.sample()
+            print(action)
+            results = env.step(action)
 
-            plotter.live_plotter(results[1], 'Reward')
+            # plotter.live_plotter(results[1], 'Reward')
             sleep(.1)
 
         print('Resetting')
