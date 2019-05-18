@@ -124,7 +124,7 @@ class BaseFetchEnv(BaseBulletEnv, gym.GoalEnv, ABC):
             BaseBulletEnv.__init__(self, robot)
 
         self.observation_space = None  # type: spaces.Dict
-        # self.reset() # here
+        self.reset() # here
 
     def seed(self, seed=None):
         self.np_random, seed = seeding.np_random(seed)
@@ -199,6 +199,8 @@ class BaseFetchEnv(BaseBulletEnv, gym.GoalEnv, ABC):
             self.robot.action_space_only_unlocked = self.action_space_only_unlocked
             high = np.ones([sum(~np.array(self.robot.lock_joints))])
             self.action_space = gym.spaces.Box(-high, high)
+            high = np.inf * np.ones([sum(~np.array(self.robot.lock_joints))])
+            self.observation_space = gym.spaces.Box(-high, high)
 
         if self.physicsClientId < 0:
             self.ownsPhysicsClient = True
