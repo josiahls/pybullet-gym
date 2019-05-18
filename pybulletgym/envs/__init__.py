@@ -233,6 +233,12 @@ register(
 )
 
 register(
+	id='FetchPush-v2',
+	entry_point='pybulletgym.envs.fetch_env.gym_locomotion_envs_v2:FetchPush',
+	max_episode_steps=50,
+)
+
+register(
 	id='FetchSlide-v2',
 	entry_point='pybulletgym.envs.fetch_env.gym_locomotion_envs_v2:FetchSlide',
 	max_episode_steps=50,

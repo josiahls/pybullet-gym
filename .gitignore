@@ -103,3 +103,4 @@ ENV/
 # intellij idea
 .idea/
 /reference/
+/pybulletgym/envs/normalization_weights/
