@@ -67,7 +67,7 @@ class BaseFetchEnv(BaseBulletEnv, gym.GoalEnv, ABC):
     def __init__(self, initial_qpos: dict = None, robot: FetchURDF = None, block_gripper=True, n_substeps=20,
                  gripper_extra_height=0.48,
                  target_in_the_air=True, target_offset=0.0, obj_range=0.15, target_range=0.25,
-                 distance_threshold=0.08, reward_type: str = 'sparse',
+                 distance_threshold=0.08, reward_type: str = 'sparse', mode='rgb_array',
                  power=0.2):
         """
 
@@ -122,6 +122,7 @@ class BaseFetchEnv(BaseBulletEnv, gym.GoalEnv, ABC):
                 robot.observation_space = gym.spaces.Box(-high, high)
 
             BaseBulletEnv.__init__(self, robot)
+            self.isRender = mode == 'human'
 
         self.observation_space = None  # type: spaces.Dict
         self.reset() # here
@@ -171,6 +172,7 @@ class BaseFetchEnv(BaseBulletEnv, gym.GoalEnv, ABC):
         Normalizer.cache_all_min_maxes()
         self._reset_sim()
         self._env_specific_callback()
+        self.scene.global_step()
         self.goal = self._sample_goal()
         obs = self._get_obs()
         self.observation_space = spaces.Dict(dict(
@@ -334,20 +336,28 @@ class BaseFetchEnv(BaseBulletEnv, gym.GoalEnv, ABC):
         """
         for scene_object in self.scene.scene_objects:
             if type(scene_object) is TargetSceneObject:
-                # Get the original position of the gripper
-                qpos = self.robot.parts['gripper_link'].get_position()
-                # Set the position of the target relative to the gripper
-                target_pos = qpos + np.random.uniform(-self.target_range, self.target_range, size=3)
+                # We want to make sure that the target is not already being set at the goal.
+                # otherwise, the robot will have a hard time correlating its actions with the goal
+                while True:
+                    # Get the original position of the gripper
+                    qpos = self.robot.parts['gripper_link'].get_position()
+                    # Set the position of the target relative to the gripper
+                    target_pos = qpos + np.random.uniform(-self.target_range, self.target_range, size=3)
 
-                target_pos += self.target_offset
+                    target_pos += self.target_offset
 
-                # TODO change self.gripper_extra_height to general extra height
-                # needs the motion planner for gripper extra height addition to be added.
-                target_pos[2] = self.gripper_extra_height
-                if self.target_in_the_air and self.np_random.uniform() < 0.5:
-                    target_pos[2] += self.np_random.uniform(0, 0.45)
+                    # TODO change self.gripper_extra_height to general extra height
+                    # needs the motion planner for gripper extra height addition to be added.
+                    target_pos[2] = self.gripper_extra_height
+                    if self.target_in_the_air and self.np_random.uniform() < 0.5:
+                        target_pos[2] += self.np_random.uniform(0, 0.45)
 
-                return scene_object.reset_position(target_pos)
+                    if not self._is_success(self._achieved_goal_callback(), self._sampled_goal_callback(target_pos)):
+                        break
+                    print('_sample_goal: Resampling...')
+
+                scene_object.reset_position(target_pos)
+                return target_pos
 
     def _env_setup(self, initial_qpos=None):
         """
@@ -418,7 +428,7 @@ class BaseFetchEnv(BaseBulletEnv, gym.GoalEnv, ABC):
 
 
 class FetchReach(BaseFetchEnv, ABC):
-    def __init__(self):
+    def __init__(self, mode='rgb_array'):
         robot = FetchURDF()
         robot.lock_joints = [True] * robot.action_space.shape[0]
         robot.lock_joints[10] = False  # Unlock 'shoulder_pan_joint
@@ -438,7 +448,7 @@ class FetchReach(BaseFetchEnv, ABC):
             'TargetSceneObject:0:joint': [.75, 0, 0.60, 1., 0., 0., 0.],
         }
 
-        super().__init__(robot=robot, initial_qpos=initial_qpos)
+        super().__init__(robot=robot, initial_qpos=initial_qpos, mode=mode)
 
     def create_single_player_scene(self, _p: BulletClient):
         self.scene = ReachScene(_p, gravity=9.8, timestep=0.0165 / 4, frame_skip=4)
@@ -446,7 +456,7 @@ class FetchReach(BaseFetchEnv, ABC):
 
 
 class FetchSlide(BaseFetchEnv, ABC):
-    def __init__(self):
+    def __init__(self, mode='rgb_array'):
         robot = FetchURDF()
         robot.lock_joints = [True] * robot.action_space.shape[0]
         robot.lock_joints[10] = False  # Unlock 'shoulder_pan_joint
@@ -467,7 +477,7 @@ class FetchSlide(BaseFetchEnv, ABC):
         }
 
         super().__init__(robot=robot, initial_qpos=initial_qpos, target_offset=[0.4, 0, 0],
-                         target_in_the_air=False, reward_type='sparse')
+                         target_in_the_air=False, reward_type='sparse', mode=mode)
 
     def create_single_player_scene(self, _p: BulletClient):
         self.scene = SlideScene(_p, gravity=9.8, timestep=0.0165 / 4, frame_skip=4)
@@ -490,7 +500,7 @@ class FetchSlide(BaseFetchEnv, ABC):
 
 
 class FetchPickAndPlace(BaseFetchEnv, ABC):
-    def __init__(self):
+    def __init__(self, mode='rgb_array'):
         robot = FetchURDF()
         robot.lock_joints = [True] * robot.action_space.shape[0]
         robot.lock_joints[10] = False  # Unlock 'shoulder_pan_joint
@@ -511,7 +521,7 @@ class FetchPickAndPlace(BaseFetchEnv, ABC):
         }
 
         super().__init__(robot=robot, initial_qpos=initial_qpos,
-                         target_in_the_air=True, reward_type='sparse')
+                         target_in_the_air=True, reward_type='sparse', mode=mode)
 
     def create_single_player_scene(self, _p: BulletClient):
         self.scene = PickAndPlaceScene(_p, gravity=9.8, timestep=0.0165 / 4, frame_skip=4)
@@ -534,7 +544,7 @@ class FetchPickAndPlace(BaseFetchEnv, ABC):
 
 
 class FetchPush(BaseFetchEnv, ABC):
-    def __init__(self):
+    def __init__(self, mode='rgb_array'):
         robot = FetchURDF()
         robot.lock_joints = [True] * robot.action_space.shape[0]
         robot.lock_joints[10] = False  # Unlock 'shoulder_pan_joint
@@ -555,7 +565,7 @@ class FetchPush(BaseFetchEnv, ABC):
         }
 
         super().__init__(robot=robot, initial_qpos=initial_qpos,
-                         target_in_the_air=False, reward_type='sparse')
+                         target_in_the_air=False, reward_type='sparse', mode=mode)
 
     def create_single_player_scene(self, _p: BulletClient):
         self.scene = PickAndPlaceScene(_p, gravity=9.8, timestep=0.0165 / 4, frame_skip=4)
@@ -578,7 +588,7 @@ class FetchPush(BaseFetchEnv, ABC):
 
 
 class FetchPickKnifeAndPlace(BaseFetchEnv, ABC):
-    def __init__(self):
+    def __init__(self, mode='rgb_array'):
         robot = FetchURDF()
         robot.lock_joints = [True] * robot.action_space.shape[0]
         robot.lock_joints[10] = False  # Unlock 'shoulder_pan_joint
@@ -599,7 +609,7 @@ class FetchPickKnifeAndPlace(BaseFetchEnv, ABC):
         }
 
         super().__init__(robot=robot, initial_qpos=initial_qpos,
-                         target_in_the_air=False, reward_type='sparse')
+                         target_in_the_air=False, reward_type='sparse', mode=mode)
 
     def create_single_player_scene(self, _p: BulletClient):
         self.scene = KnifeScene(_p, gravity=9.8, timestep=0.0165 / 4, frame_skip=4)

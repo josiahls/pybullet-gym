@@ -10,8 +10,9 @@ from utils import Plotter
 env_list = [
     # 'FetchReach-v2',
     # 'FetchSlide-v2',
+    'FetchPush-v2',
     # 'FetchPickAndPlace-v2',
-    'FetchPickKnifeAndPlace-v2',
+    # 'FetchPickKnifeAndPlace-v2',
     # 'FetchMountainCar-v2'
 ]
 
@@ -19,7 +20,7 @@ for env_name in env_list:
     sleep(1)
     print(f'Testing {env_name}')
     # Load the OpenAI gym env
-    env = gym.make(env_name)  # type: gym.Env
+    env = gym.make(env_name, mode='human')  # type: gym.Env
     if hasattr(env.env, 'action_space_only_unlocked'):
         env.env.action_space_only_unlocked = True
 
@@ -31,9 +32,9 @@ for env_name in env_list:
     env.render(mode="human")
     env.reset()
 
-    # plotter = Plotter()
+    plotter = Plotter()
 
-    for i in range(1):
+    for i in range(2000):
         for _ in range(5):
             print(env.render(mode="human"))
             # results = env.step(env.action_space.sample())
@@ -47,7 +48,7 @@ for env_name in env_list:
             print(action)
             results = env.step(action)
 
-            # plotter.live_plotter(results[1], 'Reward')
+            plotter.live_plotter(results[1], 'Reward')
             sleep(.1)
 
         print('Resetting')
