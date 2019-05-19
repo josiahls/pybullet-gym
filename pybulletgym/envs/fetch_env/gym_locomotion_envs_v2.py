@@ -352,11 +352,12 @@ class BaseFetchEnv(BaseBulletEnv, gym.GoalEnv, ABC):
                     if self.target_in_the_air and self.np_random.uniform() < 0.5:
                         target_pos[2] += self.np_random.uniform(0, 0.45)
 
+                    scene_object.reset_position(target_pos)
+                    self.scene.global_step()
                     if not self._is_success(self._achieved_goal_callback(), self._sampled_goal_callback(target_pos)):
                         break
                     print('_sample_goal: Resampling...')
 
-                scene_object.reset_position(target_pos)
                 return target_pos
 
     def _env_setup(self, initial_qpos=None):
