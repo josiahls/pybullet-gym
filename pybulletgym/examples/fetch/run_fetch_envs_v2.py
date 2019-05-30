@@ -9,8 +9,8 @@ from utils import Plotter
 
 env_list = [
     # 'FetchReach-v2',
-    # 'FetchSlide-v2',
-    'FetchPush-v2',
+    'FetchSlide-v2',
+    # 'FetchPush-v2',
     # 'FetchPickAndPlace-v2',
     # 'FetchPickKnifeAndPlace-v2',
     # 'FetchMountainCar-v2'
@@ -32,10 +32,10 @@ for env_name in env_list:
     env.render(mode="human")
     env.reset()
 
-    plotter = Plotter()
+    # plotter = Plotter()
 
     for i in range(2000):
-        for _ in range(5):
+        for _ in range(25):
             print(env.render(mode="human"))
             # results = env.step(env.action_space.sample())
             # fetchPos, fetchOrn = env.env._p.getBasePositionAndOrientation(baseId)
@@ -45,11 +45,11 @@ for env_name in env_list:
 
             # results = env.step(np.zeros(env.action_space.high.shape))
             action = env.action_space.sample()
-            print(action)
+            # print(action)
             results = env.step(action)
 
-            plotter.live_plotter(results[1], 'Reward')
+            # plotter.live_plotter(results[1], 'Reward')
             sleep(.1)
 
-        print('Resetting')
+        # print('Resetting')
         env.reset()

@@ -64,8 +64,8 @@ from .robot_locomotors import FetchURDF
 
 
 class BaseFetchEnv(BaseBulletEnv, gym.GoalEnv, ABC):
-    def __init__(self, initial_qpos: dict = None, robot: FetchURDF = None, block_gripper=True, n_substeps=20,
-                 gripper_extra_height=0.48,
+    def __init__(self, initial_qpos: dict = None, robot: FetchURDF = None, block_gripper=False, orthogonal_wrist=True,
+                 n_substeps=20, gripper_extra_height=0.48, height_offset=0.47,
                  target_in_the_air=True, target_offset=0.0, obj_range=0.15, target_range=0.25,
                  distance_threshold=0.08, reward_type: str = 'sparse', mode='rgb_array',
                  power=0.2):
@@ -87,6 +87,9 @@ class BaseFetchEnv(BaseBulletEnv, gym.GoalEnv, ABC):
             power (float): The amount of base power asserted by the robot on an action
         """
 
+        self.height_offset = height_offset
+        self.orthogonal_wrist = orthogonal_wrist
+        self.block_gripper = block_gripper
         self.n_substeps = n_substeps
         self.gripper_extra_height = gripper_extra_height
         self.obj_range = obj_range
@@ -108,7 +111,7 @@ class BaseFetchEnv(BaseBulletEnv, gym.GoalEnv, ABC):
         self.initial_qpos = initial_qpos  # type: Dict[str, None]
         self.robot = None  # If not None, will be set in the parent super call
 
-        # If true, then only the unlocked actions will be considered this means that when a model is learnign to move,
+        # If true, then only the unlocked actions will be considered this means that when a model is learning to move,
         # the expected action space output will be only the unlocked actions, as opposed to all actions.
         # This is so that we can have a model that trains faster.
         self.action_space_only_unlocked = True
@@ -121,11 +124,13 @@ class BaseFetchEnv(BaseBulletEnv, gym.GoalEnv, ABC):
                 high = np.inf * np.ones([sum(~np.array(robot.lock_joints))])
                 robot.observation_space = gym.spaces.Box(-high, high)
 
+            robot.orthogonal_wrist = self.orthogonal_wrist
+            robot.block_gripper = self.block_gripper
             BaseBulletEnv.__init__(self, robot)
             self.isRender = mode == 'human'
 
         self.observation_space = None  # type: spaces.Dict
-        self.reset() # here
+        self.reset()
 
     def seed(self, seed=None):
         self.np_random, seed = seeding.np_random(seed)
@@ -263,7 +268,7 @@ class BaseFetchEnv(BaseBulletEnv, gym.GoalEnv, ABC):
 
     def _achieved_goal_callback(self, goal=None) -> np.array:
         """
-        Default achieved goal callback is the robot's gripper position.
+        Default achieved goal callback is the robot's average finger position.
 
         Args:
             goal:
@@ -271,7 +276,8 @@ class BaseFetchEnv(BaseBulletEnv, gym.GoalEnv, ABC):
         Returns:
 
         """
-        return self.robot.parts['gripper_link'].get_position().flatten()
+        return np.average((self.robot.parts['r_gripper_finger_link'].get_position().flatten(),
+                           self.robot.parts['l_gripper_finger_link'].get_position().flatten()), axis=0)
 
     def _sampled_goal_callback(self, goal=None) -> np.array:
         """
@@ -348,7 +354,7 @@ class BaseFetchEnv(BaseBulletEnv, gym.GoalEnv, ABC):
 
                     # TODO change self.gripper_extra_height to general extra height
                     # needs the motion planner for gripper extra height addition to be added.
-                    target_pos[2] = self.gripper_extra_height
+                    target_pos[2] = self.height_offset
                     if self.target_in_the_air and self.np_random.uniform() < 0.5:
                         target_pos[2] += self.np_random.uniform(0, 0.45)
 
@@ -376,11 +382,30 @@ class BaseFetchEnv(BaseBulletEnv, gym.GoalEnv, ABC):
                     if type(scene_object) is TargetSceneObject:
                         scene_object.reset_position(initial_qpos[key][:3])
                         break
-            # TODO gripper_extra_height adjust the height of the gripper.
-            # Probably needs to use a deterministic motion planner.
 
             for _ in range(100):
                 self.scene.global_step()
+
+            # Change the gripper height and adjust accordingly.
+            gripper_position = self.robot.parts['gripper_link'].get_position()
+            gripper_position[2] += self.gripper_extra_height
+            need_lower = self.gripper_extra_height < 0
+            for _ in range(100):
+                self.scene.global_step()
+                current_position = self.robot.parts['gripper_link'].get_position()
+                if current_position[2] < gripper_position[2] and not need_lower:
+                    # If the current position is less than the gripper expected position
+                    # then we need to un-curl the arm
+                    for key in [_ for _ in initial_qpos if _.__contains__('robot') and (_.__contains__('flex')
+                                                                                        or _.__contains__('lift'))]:
+                        position = self.robot.jdict[key.split(':')[-1]].get_position()
+                        self.robot.jdict[key.split(':')[-1]].set_position(position - 0.01, 1.2)
+                elif current_position[2] > gripper_position[2] and need_lower:
+                    for key in [_ for _ in initial_qpos if _.__contains__('robot') and (_.__contains__('flex')
+                                                                                        or _.__contains__('lift'))]:
+                        position = self.robot.jdict[key.split(':')[-1]].get_position()
+                        self.robot.jdict[key.split(':')[-1]].set_position(position + 0.01, 1.2)
+
 
     def _viewer_setup(self):
         """Initial configuration of the viewer. Can be used to set the camera position,
@@ -435,7 +460,7 @@ class FetchReach(BaseFetchEnv, ABC):
         robot.lock_joints[10] = False  # Unlock 'shoulder_pan_joint
         robot.lock_joints[11] = False  # Unlock 'shoulder_lift_joint'
         robot.lock_joints[13] = False  # Unlock 'elbow_flex_joint'
-        robot.lock_joints[15] = False  # Unlock 'wrist_flex_joint'
+        # robot.lock_joints[15] = False  # Unlock 'wrist_flex_joint' Removed to reduce action space.
         robot.lock_joints[17] = False  # Unlock 'gripper_axis'
 
         initial_qpos = {
@@ -449,7 +474,8 @@ class FetchReach(BaseFetchEnv, ABC):
             'TargetSceneObject:0:joint': [.75, 0, 0.60, 1., 0., 0., 0.],
         }
 
-        super().__init__(robot=robot, initial_qpos=initial_qpos, mode=mode)
+        super().__init__(robot=robot, target_in_the_air=True, block_gripper=True,
+                         initial_qpos=initial_qpos, gripper_extra_height=-.1, mode=mode)
 
     def create_single_player_scene(self, _p: BulletClient):
         self.scene = ReachScene(_p, gravity=9.8, timestep=0.0165 / 4, frame_skip=4)
@@ -463,7 +489,7 @@ class FetchSlide(BaseFetchEnv, ABC):
         robot.lock_joints[10] = False  # Unlock 'shoulder_pan_joint
         robot.lock_joints[11] = False  # Unlock 'shoulder_lift_joint'
         robot.lock_joints[13] = False  # Unlock 'elbow_flex_joint'
-        robot.lock_joints[15] = False  # Unlock 'wrist_flex_joint'
+        # robot.lock_joints[15] = False  # Unlock 'wrist_flex_joint' Removed to reduce action space.
         robot.lock_joints[17] = False  # Unlock 'gripper_axis'
 
         initial_qpos = {
@@ -477,8 +503,8 @@ class FetchSlide(BaseFetchEnv, ABC):
             'TargetSceneObject:0:joint': [1.75, 0, 0.60, 1., 0., 0., 0.],
         }
 
-        super().__init__(robot=robot, initial_qpos=initial_qpos, target_offset=[0.4, 0, 0],
-                         target_in_the_air=False, reward_type='sparse', mode=mode)
+        super().__init__(robot=robot, initial_qpos=initial_qpos, target_offset=[0.4, 0, 0], gripper_extra_height=-.1,
+                         target_in_the_air=False, reward_type='sparse', block_gripper=True, mode=mode)
 
     def create_single_player_scene(self, _p: BulletClient):
         self.scene = SlideScene(_p, gravity=9.8, timestep=0.0165 / 4, frame_skip=4)
@@ -507,7 +533,7 @@ class FetchPickAndPlace(BaseFetchEnv, ABC):
         robot.lock_joints[10] = False  # Unlock 'shoulder_pan_joint
         robot.lock_joints[11] = False  # Unlock 'shoulder_lift_joint'
         robot.lock_joints[13] = False  # Unlock 'elbow_flex_joint'
-        robot.lock_joints[15] = False  # Unlock 'wrist_flex_joint'
+        # robot.lock_joints[15] = False  # Unlock 'wrist_flex_joint' Removed to reduce action space.
         robot.lock_joints[17] = False  # Unlock 'gripper_axis'
 
         initial_qpos = {
@@ -521,7 +547,7 @@ class FetchPickAndPlace(BaseFetchEnv, ABC):
             'TargetSceneObject:0:joint': [0.75, 0, 0.60, 1., 0., 0., 0.],
         }
 
-        super().__init__(robot=robot, initial_qpos=initial_qpos,
+        super().__init__(robot=robot, initial_qpos=initial_qpos, gripper_extra_height=-.1,
                          target_in_the_air=True, reward_type='sparse', mode=mode)
 
     def create_single_player_scene(self, _p: BulletClient):
@@ -551,7 +577,7 @@ class FetchPush(BaseFetchEnv, ABC):
         robot.lock_joints[10] = False  # Unlock 'shoulder_pan_joint
         robot.lock_joints[11] = False  # Unlock 'shoulder_lift_joint'
         robot.lock_joints[13] = False  # Unlock 'elbow_flex_joint'
-        robot.lock_joints[15] = False  # Unlock 'wrist_flex_joint'
+        # robot.lock_joints[15] = False  # Unlock 'wrist_flex_joint' Removed to reduce action space.
         robot.lock_joints[17] = False  # Unlock 'gripper_axis'
 
         initial_qpos = {
@@ -565,7 +591,7 @@ class FetchPush(BaseFetchEnv, ABC):
             'TargetSceneObject:0:joint': [0.75, 0, 0.60, 1., 0., 0., 0.],
         }
 
-        super().__init__(robot=robot, initial_qpos=initial_qpos,
+        super().__init__(robot=robot, initial_qpos=initial_qpos, gripper_extra_height=-.1, block_gripper=True,
                          target_in_the_air=False, reward_type='sparse', mode=mode)
 
     def create_single_player_scene(self, _p: BulletClient):
@@ -595,7 +621,7 @@ class FetchPickKnifeAndPlace(BaseFetchEnv, ABC):
         robot.lock_joints[10] = False  # Unlock 'shoulder_pan_joint
         robot.lock_joints[11] = False  # Unlock 'shoulder_lift_joint'
         robot.lock_joints[13] = False  # Unlock 'elbow_flex_joint'
-        robot.lock_joints[15] = False  # Unlock 'wrist_flex_joint'
+        # robot.lock_joints[15] = False  # Unlock 'wrist_flex_joint' Removed to reduce action space.
         robot.lock_joints[17] = False  # Unlock 'gripper_axis'
 
         initial_qpos = {
@@ -609,7 +635,7 @@ class FetchPickKnifeAndPlace(BaseFetchEnv, ABC):
             'TargetSceneObject:0:joint': [0.75, 0, 0.60, 1., 0., 0., 0.],
         }
 
-        super().__init__(robot=robot, initial_qpos=initial_qpos,
+        super().__init__(robot=robot, initial_qpos=initial_qpos, gripper_extra_height=-.1,
                          target_in_the_air=False, reward_type='sparse', mode=mode)
 
     def create_single_player_scene(self, _p: BulletClient):

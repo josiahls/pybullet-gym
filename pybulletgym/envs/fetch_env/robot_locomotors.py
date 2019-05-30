@@ -12,6 +12,14 @@ from .robot_bases import Joint
 import pybullet
 from pybullet_envs.bullet import bullet_client
 
+"""
+# orientation = self._p.getEulerFromQuaternion(self.parts['gripper_link'].get_orientation())
+# init_orientation = self._p.getEulerFromQuaternion(self.parts['gripper_link'].initialOrientation)
+# normal = np.array(orientation) @ np.array(init_orientation)
+# print(f'Normal {np.array(orientation) @ np.array(init_orientation)} Diff {orientation} Pos: {pos}')
+
+"""
+
 from pybulletgym.envs.mujoco.robot_bases import XmlBasedRobot, MJCFBasedRobot
 
 
@@ -21,6 +29,10 @@ class FetchURDF(URDFBasedRobot):
         URDFBasedRobot.__init__(self, "fetch/fetch_description/robots/fetch.urdf", "base_link", action_dim=25,
                                 obs_dim=70, self_collision=True)
         self.power = power
+        self.orthogonal_wrist = False
+        self.initial_wrist_orientation = None
+        # Keeps the finger locations on their closed position
+        self.block_gripper = False
         self.camera_x = 0
         self.start_pos_x, self.start_pos_y, self.start_pos_z = 0, 0, 0.01
         self.manipulator_target_x = 1e3  # kilometers away
@@ -114,7 +126,24 @@ class FetchURDF(URDFBasedRobot):
                     ii += 1
                     j.set_position(pos + _a, maxVelocity)
                 else:
-                    j.set_position(pos, maxVelocity)
+                    if self.block_gripper and j.joint_name.__contains__('l_gripper_finger_joint'):
+                        j.set_position(0, maxVelocity)
+                    elif self.block_gripper and j.joint_name.__contains__('r_gripper_finger_joint'):
+                        j.set_position(0, maxVelocity)
+                    elif self.orthogonal_wrist and j.joint_name.__contains__('wrist_flex_joint'):
+                        gripper_position = np.array(self.parts['gripper_link'].get_position())
+                        wrist_position = np.array(self.parts['wrist_flex_link'].get_position())
+                        gripper_orientation = np.array(self._p.getEulerFromQuaternion(self.parts['gripper_link'].get_orientation()))
+                        wrist_orientation = np.array(self._p.getEulerFromQuaternion(self.parts['wrist_flex_link'].get_orientation()))
+                        if self.initial_wrist_orientation is None:
+                            self.initial_wrist_orientation = wrist_orientation
+
+                        # Note, -1 direction curls in, +1 curls out
+                        orientation_difference = abs(self.initial_wrist_orientation[1] - wrist_orientation[1])
+                        position_difference = gripper_position[0] - wrist_position[0]
+                        j.set_position(pos - np.sign(position_difference) * orientation_difference, 0.5)
+                    else:
+                        j.set_position(pos, maxVelocity)
             else:
                 i += 1
 
