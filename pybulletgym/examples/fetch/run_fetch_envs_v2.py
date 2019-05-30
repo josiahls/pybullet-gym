@@ -8,8 +8,8 @@ import pybullet as p
 from utils import Plotter
 
 env_list = [
-    # 'FetchReach-v2',
-    'FetchSlide-v2',
+    'FetchReach-v2',
+    # 'FetchSlide-v2',
     # 'FetchPush-v2',
     # 'FetchPickAndPlace-v2',
     # 'FetchPickKnifeAndPlace-v2',

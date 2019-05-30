@@ -461,7 +461,7 @@ class FetchReach(BaseFetchEnv, ABC):
         robot.lock_joints[11] = False  # Unlock 'shoulder_lift_joint'
         robot.lock_joints[13] = False  # Unlock 'elbow_flex_joint'
         # robot.lock_joints[15] = False  # Unlock 'wrist_flex_joint' Removed to reduce action space.
-        robot.lock_joints[17] = False  # Unlock 'gripper_axis'
+        # robot.lock_joints[17] = False  # Unlock 'gripper_axis'
 
         initial_qpos = {
             'robot:0:shoulder_lift_joint': -0.7,
@@ -490,7 +490,7 @@ class FetchSlide(BaseFetchEnv, ABC):
         robot.lock_joints[11] = False  # Unlock 'shoulder_lift_joint'
         robot.lock_joints[13] = False  # Unlock 'elbow_flex_joint'
         # robot.lock_joints[15] = False  # Unlock 'wrist_flex_joint' Removed to reduce action space.
-        robot.lock_joints[17] = False  # Unlock 'gripper_axis'
+        # robot.lock_joints[17] = False  # Unlock 'gripper_axis'
 
         initial_qpos = {
             'robot:0:shoulder_lift_joint': -0.7,
@@ -534,7 +534,7 @@ class FetchPickAndPlace(BaseFetchEnv, ABC):
         robot.lock_joints[11] = False  # Unlock 'shoulder_lift_joint'
         robot.lock_joints[13] = False  # Unlock 'elbow_flex_joint'
         # robot.lock_joints[15] = False  # Unlock 'wrist_flex_joint' Removed to reduce action space.
-        robot.lock_joints[17] = False  # Unlock 'gripper_axis'
+        # robot.lock_joints[17] = False  # Unlock 'gripper_axis'
 
         initial_qpos = {
             'robot:0:shoulder_lift_joint': -0.7,
@@ -578,7 +578,7 @@ class FetchPush(BaseFetchEnv, ABC):
         robot.lock_joints[11] = False  # Unlock 'shoulder_lift_joint'
         robot.lock_joints[13] = False  # Unlock 'elbow_flex_joint'
         # robot.lock_joints[15] = False  # Unlock 'wrist_flex_joint' Removed to reduce action space.
-        robot.lock_joints[17] = False  # Unlock 'gripper_axis'
+        # robot.lock_joints[17] = False  # Unlock 'gripper_axis'
 
         initial_qpos = {
             'robot:0:shoulder_lift_joint': -0.7,
@@ -622,7 +622,7 @@ class FetchPickKnifeAndPlace(BaseFetchEnv, ABC):
         robot.lock_joints[11] = False  # Unlock 'shoulder_lift_joint'
         robot.lock_joints[13] = False  # Unlock 'elbow_flex_joint'
         # robot.lock_joints[15] = False  # Unlock 'wrist_flex_joint' Removed to reduce action space.
-        robot.lock_joints[17] = False  # Unlock 'gripper_axis'
+        # robot.lock_joints[17] = False  # Unlock 'gripper_axis'
 
         initial_qpos = {
             'robot:0:shoulder_lift_joint': -0.7,
