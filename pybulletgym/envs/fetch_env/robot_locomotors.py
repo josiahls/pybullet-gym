@@ -48,6 +48,7 @@ class FetchURDF(URDFBasedRobot):
         self.ordered_joints = None  # type: Dict[Joint]
         self.robot_body = None
         self.action_space_only_unlocked = False
+        self.lock_joint_initial_pos_dict = {}
         if action_locks is None:
             self.lock_joints = [False] * self.action_space.shape[0]
         else:
@@ -143,6 +144,11 @@ class FetchURDF(URDFBasedRobot):
                         position_difference = gripper_position[0] - wrist_position[0]
                         j.set_position(pos - np.sign(position_difference) * orientation_difference, 0.5)
                     else:
+                        if j.joint_name not in self.lock_joint_initial_pos_dict:
+                            self.lock_joint_initial_pos_dict[j.joint_name] = pos
+                        else:
+                            pos = self.lock_joint_initial_pos_dict[j.joint_name]
+
                         j.set_position(pos, maxVelocity)
             else:
                 i += 1
