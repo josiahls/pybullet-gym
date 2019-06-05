@@ -20,7 +20,7 @@ for env_name in env_list:
     sleep(1)
     print(f'Testing {env_name}')
     # Load the OpenAI gym env
-    env = gym.make(env_name, mode='human')  # type: gym.Env
+    env = gym.make(env_name, mode='rgb_array')  # type: gym.Env
     if hasattr(env.env, 'action_space_only_unlocked'):
         env.env.action_space_only_unlocked = True
 
@@ -29,14 +29,14 @@ for env_name in env_list:
     # In order to loop this, we need it to run rgb_array not human. This is due to the global env variables
     # being initialized and then being confused on re-init
     # env.render(mode="rgb_array")
-    env.render(mode="human")
+    env.render(mode="rgb_array")
     env.reset()
 
     # plotter = Plotter()
 
     for i in range(2000):
-        for _ in range(25):
-            print(env.render(mode="human"))
+        for _ in range(15):
+            # print(env.render(mode="human"))
             # results = env.step(env.action_space.sample())
             # fetchPos, fetchOrn = env.env._p.getBasePositionAndOrientation(baseId)
             # distance = 1.5

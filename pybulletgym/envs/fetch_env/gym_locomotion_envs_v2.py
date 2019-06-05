@@ -65,8 +65,8 @@ from .robot_locomotors import FetchURDF
 
 class BaseFetchEnv(BaseBulletEnv, gym.GoalEnv, ABC):
     def __init__(self, initial_qpos: dict = None, robot: FetchURDF = None, block_gripper=False, orthogonal_wrist=True,
-                 n_substeps=20, gripper_extra_height=0.48, height_offset=0.47,
-                 target_in_the_air=True, target_offset=0.0, obj_range=0.15, target_range=0.25,
+                 n_substeps=10, gripper_extra_height=0.48, height_offset=0.47,
+                 target_in_the_air=True, target_offset=0.0, obj_range=0.15, target_range=0.15,
                  distance_threshold=0.08, reward_type: str = 'sparse', mode='rgb_array',
                  power=0.2):
         """
@@ -107,9 +107,10 @@ class BaseFetchEnv(BaseBulletEnv, gym.GoalEnv, ABC):
         self.stateId = -1
         self.n_trackable_objects = 5
         self._use_image_state = False
-        self._im_size_fac = 10  # Factor to reduce the image by
+        self._im_size_fac = 10
         self.initial_qpos = initial_qpos  # type: Dict[str, None]
         self.robot = None  # If not None, will be set in the parent super call
+        self.robot_base_id = -1
 
         # If true, then only the unlocked actions will be considered this means that when a model is learning to move,
         # the expected action space output will be only the unlocked actions, as opposed to all actions.
@@ -127,6 +128,12 @@ class BaseFetchEnv(BaseBulletEnv, gym.GoalEnv, ABC):
             robot.orthogonal_wrist = self.orthogonal_wrist
             robot.block_gripper = self.block_gripper
             BaseBulletEnv.__init__(self, robot)
+            # Overriding the BaseBullet init above.
+            self._cam_dist = 2
+            self._cam_yaw = 90
+            self._cam_pitch = -30
+            self._im_size_fac = 2  # Factor to reduce the image by
+
             self.isRender = mode == 'human'
 
         self.observation_space = None  # type: spaces.Dict
@@ -164,6 +171,7 @@ class BaseFetchEnv(BaseBulletEnv, gym.GoalEnv, ABC):
                 self.scene.global_step()
             self._step_callback()
 
+        # self._viewer_setup()
         obs = self._get_obs()
 
         done = False
@@ -352,11 +360,10 @@ class BaseFetchEnv(BaseBulletEnv, gym.GoalEnv, ABC):
 
                     target_pos += self.target_offset
 
-                    # TODO change self.gripper_extra_height to general extra height
                     # needs the motion planner for gripper extra height addition to be added.
                     target_pos[2] = self.height_offset
                     if self.target_in_the_air and self.np_random.uniform() < 0.5:
-                        target_pos[2] += self.np_random.uniform(0, 0.45)
+                        target_pos[2] += self.np_random.uniform(0, 0.20)
 
                     scene_object.reset_position(target_pos)
                     self.scene.global_step()
@@ -406,12 +413,15 @@ class BaseFetchEnv(BaseBulletEnv, gym.GoalEnv, ABC):
                         position = self.robot.jdict[key.split(':')[-1]].get_position()
                         self.robot.jdict[key.split(':')[-1]].set_position(position + 0.01, 1.2)
 
-
     def _viewer_setup(self):
         """Initial configuration of the viewer. Can be used to set the camera position,
         for example.
         """
-        pass
+        if self.robot:
+            robot_pos, robot_or = self._p.getBasePositionAndOrientation(self.robot.robot_body.bodyIndex)
+            distance = 1.5
+            yaw = 90
+            self._p.resetDebugVisualizerCamera(distance, yaw, -45, robot_pos)
 
     def _render_callback(self):
         """A custom callback that is called before rendering. Can be used
@@ -440,6 +450,9 @@ class BaseFetchEnv(BaseBulletEnv, gym.GoalEnv, ABC):
         Returns: A flattened numpy array of the object state features.
 
         """
+        if self._use_image_state:
+            return self.render(mode='rgb_array') / 255
+
         object_states = self.scene.calc_state()
         if self.normalize_state_space_output:
             object_states = Normalizer.normalize(object_states, f'fetch_environment_objects_{object_states.shape}')
@@ -464,9 +477,9 @@ class FetchReach(BaseFetchEnv, ABC):
         # robot.lock_joints[17] = False  # Unlock 'gripper_axis'
 
         initial_qpos = {
-            'robot:0:shoulder_lift_joint': -0.7,
+            'robot:0:shoulder_lift_joint': -0.9,
             'robot:0:upperarm_roll_joint': 0,
-            'robot:0:elbow_flex_joint': -0.9,
+            'robot:0:elbow_flex_joint': -1.4,
             'robot:0:forearm_roll_joint': 0,
             'robot:0:wrist_flex_joint': -1.35,
             'robot:0:wrist_roll_joint': 0,
@@ -474,7 +487,7 @@ class FetchReach(BaseFetchEnv, ABC):
             'TargetSceneObject:0:joint': [.75, 0, 0.60, 1., 0., 0., 0.],
         }
 
-        super().__init__(robot=robot, target_in_the_air=True, block_gripper=True,
+        super().__init__(robot=robot, target_in_the_air=False, block_gripper=True,
                          initial_qpos=initial_qpos, gripper_extra_height=-.1, mode=mode)
 
     def create_single_player_scene(self, _p: BulletClient):
