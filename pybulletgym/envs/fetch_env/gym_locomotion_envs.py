@@ -331,6 +331,9 @@ class BaseFetchEnv(BaseBulletEnv, ABC):
         assert goal_a.shape == goal_b.shape
         return np.linalg.norm(goal_a - goal_b, axis=-1)
 
+    def get_goal(self):
+        return None
+
     def get_achieved_goal(self):
         pass
 
